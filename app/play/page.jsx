@@ -175,10 +175,11 @@ export default function PlayPage() {
       if (!previousState.isClimbing && state.isClimbing) {
         playSfx('climb');
       }
+      if (state.lives < previousState.lives) {
+        playSfx('lose-life');
+      }
       if (state.gameOver && !previousState.gameOver) {
         playSfx('game-over');
-      } else if (state.lives < previousState.lives) {
-        playSfx('lose-life');
       }
 
       if (
