@@ -49,37 +49,35 @@ resource vnet 'Microsoft.Network/virtualNetworks@2023-09-01' = {
         '10.0.0.0/16'
       ]
     }
-  }
-}
-
-resource containerAppsSubnet 'Microsoft.Network/virtualNetworks/subnets@2023-09-01' = {
-  parent: vnet
-  name: 'snet-containerapps'
-  properties: {
-    addressPrefix: '10.0.0.0/23'
-    privateEndpointNetworkPolicies: 'Disabled'
-    delegations: [
+    subnets: [
       {
-        name: 'Microsoft.App.environments'
+        name: 'snet-containerapps'
         properties: {
-          serviceName: 'Microsoft.App/environments'
+          addressPrefix: '10.0.0.0/23'
+          privateEndpointNetworkPolicies: 'Disabled'
+          delegations: [
+            {
+              name: 'Microsoft.App.environments'
+              properties: {
+                serviceName: 'Microsoft.App/environments'
+              }
+            }
+          ]
+        }
+      }
+      {
+        name: 'snet-privateendpoints'
+        properties: {
+          addressPrefix: '10.0.2.0/24'
+          privateEndpointNetworkPolicies: 'Disabled'
         }
       }
     ]
   }
 }
 
-resource privateEndpointSubnet 'Microsoft.Network/virtualNetworks/subnets@2023-09-01' = {
-  parent: vnet
-  name: 'snet-privateendpoints'
-  properties: {
-    addressPrefix: '10.0.2.0/24'
-    privateEndpointNetworkPolicies: 'Disabled'
-  }
-  dependsOn: [
-    containerAppsSubnet
-  ]
-}
+var containerAppsSubnetId = '${vnet.id}/subnets/snet-containerapps'
+var privateEndpointSubnetId = '${vnet.id}/subnets/snet-privateendpoints'
 
 resource storageAccount 'Microsoft.Storage/storageAccounts@2023-05-01' = {
   name: storageAccountName
@@ -127,7 +125,7 @@ resource storageTablePrivateEndpoint 'Microsoft.Network/privateEndpoints@2023-09
   location: location
   properties: {
     subnet: {
-      id: privateEndpointSubnet.id
+      id: privateEndpointSubnetId
     }
     privateLinkServiceConnections: [
       {
@@ -170,7 +168,7 @@ resource containerAppsEnvironment 'Microsoft.App/managedEnvironments@2024-03-01'
       }
     }
     vnetConfiguration: {
-      infrastructureSubnetId: containerAppsSubnet.id
+      infrastructureSubnetId: containerAppsSubnetId
       internal: false
     }
   }
