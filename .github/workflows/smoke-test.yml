@@ -1,0 +1,33 @@
+name: Production Smoke Test
+
+on:
+  workflow_dispatch:
+    inputs:
+      base_url:
+        description: "Production URL to test (leave blank for default)"
+        required: false
+        default: ""
+  workflow_run:
+    workflows: ["Build and deploy to Azure Container Apps"]
+    types:
+      - completed
+
+jobs:
+  smoke-test:
+    name: Run smoke test against production
+    runs-on: ubuntu-latest
+    # For workflow_run triggers, only run if the deployment succeeded
+    if: >
+      github.event_name == 'workflow_dispatch' ||
+      (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success')
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Run smoke test
+        env:
+          BASE_URL: ${{ github.event.inputs.base_url || 'https://ca-ponpoko-eval.politecliff-3b621d61.koreacentral.azurecontainerapps.io' }}
+        run: |
+          chmod +x scripts/smoke-test.sh
+          bash scripts/smoke-test.sh
