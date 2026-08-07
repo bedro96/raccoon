@@ -16,11 +16,12 @@ import {
 // Fixed virtual resolution (Ponpoko-style low-res, scaled up with nearest-neighbor)
 const VIRTUAL_W = CANVAS_WIDTH;
 const VIRTUAL_H = CANVAS_HEIGHT;
+const INITIAL_HUD = { lives: INITIAL_LIVES, gameOver: false };
 
 export default function PlayPage() {
   const canvasRef = useRef(null);
-  const hudRef = useRef({ lives: INITIAL_LIVES, gameOver: false });
-  const [hud, setHud] = useState(hudRef.current);
+  const hudRef = useRef(INITIAL_HUD);
+  const [hud, setHud] = useState(INITIAL_HUD);
 
   useEffect(() => {
     const canvas = canvasRef.current;
