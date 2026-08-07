@@ -47,6 +47,7 @@ resource storageAccount 'Microsoft.Storage/storageAccounts@2023-05-01' = {
   properties: {
     minimumTlsVersion: 'TLS1_2'
     allowBlobPublicAccess: false
+    allowSharedKeyAccess: false
   }
 }
 
@@ -57,7 +58,7 @@ resource tableService 'Microsoft.Storage/storageAccounts/tableServices@2023-05-0
 
 resource leaderboardTable 'Microsoft.Storage/storageAccounts/tableServices/tables@2023-05-01' = {
   parent: tableService
-  name: 'leaderboard'
+  name: 'Leaderboard'
 }
 
 resource containerAppsEnvironment 'Microsoft.App/managedEnvironments@2024-03-01' = {
@@ -73,9 +74,6 @@ resource containerAppsEnvironment 'Microsoft.App/managedEnvironments@2024-03-01'
     }
   }
 }
-
-var storageAccountKey = listKeys(storageAccount.id, storageAccount.apiVersion).keys[0].value
-var storageConnectionString = 'DefaultEndpointsProtocol=https;AccountName=${storageAccount.name};AccountKey=${storageAccountKey};EndpointSuffix=${environment().suffixes.storage}'
 
 // A user-assigned identity (created and granted AcrPull ahead of the Container App) avoids a
 // chicken-and-egg RBAC race: a system-assigned identity only exists once the Container App itself
@@ -97,6 +95,19 @@ resource acrPullRoleAssignment 'Microsoft.Authorization/roleAssignments@2022-04-
   }
 }
 
+// Storage Table Data Contributor — lets the app's managed identity read/write the Leaderboard
+// table via Azure AD auth, required because the storage account has shared-key access disabled
+// (allowSharedKeyAccess: false), matching this subscription's security baseline policy.
+resource storageTableDataContributorRoleAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+  name: guid(storageAccount.id, containerAppIdentity.id, 'StorageTableDataContributor')
+  scope: storageAccount
+  properties: {
+    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', '0a9a7e1f-b9d0-4cc4-a60d-0319b160aaa3')
+    principalId: containerAppIdentity.properties.principalId
+    principalType: 'ServicePrincipal'
+  }
+}
+
 resource containerApp 'Microsoft.App/containerApps@2024-03-01' = {
   name: containerAppName
   location: location
@@ -108,6 +119,7 @@ resource containerApp 'Microsoft.App/containerApps@2024-03-01' = {
   }
   dependsOn: [
     acrPullRoleAssignment
+    storageTableDataContributorRoleAssignment
   ]
   properties: {
     managedEnvironmentId: containerAppsEnvironment.id
@@ -123,12 +135,6 @@ resource containerApp 'Microsoft.App/containerApps@2024-03-01' = {
           identity: containerAppIdentity.id
         }
       ]
-      secrets: [
-        {
-          name: 'azure-storage-connection-string'
-          value: storageConnectionString
-        }
-      ]
     }
     template: {
       containers: [
@@ -141,8 +147,12 @@ resource containerApp 'Microsoft.App/containerApps@2024-03-01' = {
           }
           env: [
             {
-              name: 'AZURE_STORAGE_CONNECTION_STRING'
-              secretRef: 'azure-storage-connection-string'
+              name: 'AZURE_STORAGE_ACCOUNT_URL'
+              value: storageAccount.properties.primaryEndpoints.table
+            }
+            {
+              name: 'AZURE_CLIENT_ID'
+              value: containerAppIdentity.properties.clientId
             }
           ]
         }

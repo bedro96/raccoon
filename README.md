@@ -49,7 +49,14 @@ Run it locally on port 3000 with the default in-memory leaderboard:
 docker run --rm -p 3000:3000 ponpoko
 ```
 
-To use Azure Table Storage, pass the connection string at runtime:
+To use Azure Table Storage, either:
+
+- **In production (Azure Container Apps)**: set `AZURE_STORAGE_ACCOUNT_URL` (the table endpoint, e.g.
+  `https://<account>.table.core.windows.net`) and `AZURE_CLIENT_ID` (the user-assigned managed identity's
+  client ID). The app authenticates via Azure AD (`DefaultAzureCredential`) — no connection string or
+  account key is used, since the storage account has shared-key access disabled.
+- **Locally or against another storage account that allows shared-key auth** (e.g. Azurite): pass a
+  connection string instead:
 
 ```bash
 docker run --rm -p 3000:3000 \
@@ -57,10 +64,10 @@ docker run --rm -p 3000:3000 \
   ponpoko
 ```
 
-The image runs the Next.js standalone server as a non-root user and reads runtime configuration such as
-`AZURE_STORAGE_CONNECTION_STRING` from environment variables passed to `docker run` rather than baking
-them into the image. If the connection string is omitted, the leaderboard falls back to the in-memory
-development storage implementation.
+The image runs the Next.js standalone server as a non-root user and reads all runtime configuration from
+environment variables passed to `docker run` rather than baking them into the image. If neither
+`AZURE_STORAGE_ACCOUNT_URL` nor `AZURE_STORAGE_CONNECTION_STRING` is set, the leaderboard falls back to
+the in-memory development storage implementation.
 
 ## Architecture & decisions
 
