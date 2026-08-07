@@ -25,6 +25,8 @@ describe('PlayPage', () => {
     const { container } = render(<PlayPage />);
     const canvas = container.querySelector('canvas');
     expect(canvas).toBeInTheDocument();
-    expect(screen.getByText('Lives: 3')).toBeInTheDocument();
+    expect(screen.getByText(/Lives:\s*3/)).toBeInTheDocument();
+    expect(screen.getByText(/Score:\s*0/)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Mute' })).toBeInTheDocument();
   });
 });

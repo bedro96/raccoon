@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   createInitialState,
   update,
@@ -10,18 +10,105 @@ import {
   PLAYER_HEIGHT,
   ENEMY_WIDTH,
   ENEMY_HEIGHT,
+  COLLECTIBLE_SIZE,
   INITIAL_LIVES,
 } from '../../lib/gameState.js';
 
 // Fixed virtual resolution (Ponpoko-style low-res, scaled up with nearest-neighbor)
 const VIRTUAL_W = CANVAS_WIDTH;
 const VIRTUAL_H = CANVAS_HEIGHT;
-const INITIAL_HUD = { lives: INITIAL_LIVES, gameOver: false };
+const INITIAL_HUD = { lives: INITIAL_LIVES, score: 0, gameOver: false };
 
 export default function PlayPage() {
   const canvasRef = useRef(null);
   const hudRef = useRef(INITIAL_HUD);
   const [hud, setHud] = useState(INITIAL_HUD);
+  const audioRef = useRef({ ctx: null, masterGain: null, musicGain: null, musicTimer: null, melodyIndex: 0 });
+  const mutedRef = useRef(false);
+  const [muted, setMuted] = useState(false);
+
+  const setAudioMuted = useCallback((nextMuted) => {
+    mutedRef.current = nextMuted;
+    setMuted(nextMuted);
+    const audio = audioRef.current;
+    if (audio.ctx && audio.masterGain) {
+      audio.masterGain.gain.cancelScheduledValues(audio.ctx.currentTime);
+      audio.masterGain.gain.setValueAtTime(nextMuted ? 0 : 0.2, audio.ctx.currentTime);
+    }
+  }, []);
+
+  const playTone = useCallback((frequency, duration, type, gainNode, volume = 0.18) => {
+    const audio = audioRef.current;
+    if (!audio.ctx || !gainNode) return;
+    const now = audio.ctx.currentTime;
+    const osc = audio.ctx.createOscillator();
+    const gain = audio.ctx.createGain();
+    osc.type = type;
+    osc.frequency.setValueAtTime(frequency, now);
+    gain.gain.setValueAtTime(volume, now);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + duration);
+    osc.connect(gain);
+    gain.connect(gainNode);
+    osc.start(now);
+    osc.stop(now + duration);
+  }, []);
+
+  const startMelody = useCallback(() => {
+    const audio = audioRef.current;
+    if (!audio.ctx || !audio.musicGain || audio.musicTimer) return;
+    const melody = [261.63, 329.63, 392, 329.63, 293.66, 349.23, 440, 349.23];
+    audio.musicTimer = window.setInterval(() => {
+      const current = audioRef.current;
+      if (!current.ctx || !current.musicGain) return;
+      const note = melody[current.melodyIndex % melody.length];
+      current.melodyIndex += 1;
+      playTone(note, 0.16, 'triangle', current.musicGain, 0.08);
+    }, 220);
+  }, [playTone]);
+
+  const ensureAudio = useCallback(async () => {
+    if (typeof window === 'undefined') return;
+    const audio = audioRef.current;
+    if (!audio.ctx) {
+      const AudioContextCtor = window.AudioContext || window.webkitAudioContext;
+      if (!AudioContextCtor) return;
+      const ctx = new AudioContextCtor();
+      const masterGain = ctx.createGain();
+      masterGain.gain.value = mutedRef.current ? 0 : 0.2;
+      masterGain.connect(ctx.destination);
+      const musicGain = ctx.createGain();
+      musicGain.gain.value = 1;
+      musicGain.connect(masterGain);
+      audioRef.current = { ...audioRef.current, ctx, masterGain, musicGain };
+      startMelody();
+    }
+    if (audioRef.current.ctx?.state === 'suspended') {
+      await audioRef.current.ctx.resume();
+    }
+  }, [startMelody]);
+
+  const playSfx = useCallback((kind) => {
+    const audio = audioRef.current;
+    if (!audio.ctx || !audio.masterGain) return;
+    if (kind === 'jump') {
+      playTone(440, 0.12, 'square', audio.masterGain, 0.16);
+    } else if (kind === 'climb') {
+      playTone(620, 0.08, 'sawtooth', audio.masterGain, 0.1);
+    } else if (kind === 'lose-life') {
+      playTone(220, 0.2, 'square', audio.masterGain, 0.18);
+    } else if (kind === 'game-over') {
+      playTone(180, 0.28, 'triangle', audio.masterGain, 0.2);
+      playTone(120, 0.36, 'triangle', audio.masterGain, 0.14);
+    }
+  }, [playTone]);
+
+  const onToggleAudio = useCallback(() => {
+    const nextMuted = !mutedRef.current;
+    setAudioMuted(nextMuted);
+    if (!nextMuted) {
+      void ensureAudio();
+    }
+  }, [ensureAudio, setAudioMuted]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -41,6 +128,7 @@ export default function PlayPage() {
     const onKeyDown = (e) => {
       if (e.code in keys) {
         keys[e.code] = true;
+        void ensureAudio();
         e.preventDefault();
       }
     };
@@ -76,9 +164,27 @@ export default function PlayPage() {
         jump:  keys.Space,
       };
 
-      state = update(state, input, dt);
-      if (state.lives !== hudRef.current.lives || state.gameOver !== hudRef.current.gameOver) {
-        hudRef.current = { lives: state.lives, gameOver: state.gameOver };
+      const previousState = state;
+      state = update(previousState, input, dt);
+
+      if (previousState.onGround && input.jump && !state.onGround) {
+        playSfx('jump');
+      }
+      if (!previousState.isClimbing && state.isClimbing) {
+        playSfx('climb');
+      }
+      if (state.gameOver && !previousState.gameOver) {
+        playSfx('game-over');
+      } else if (state.lives < previousState.lives) {
+        playSfx('lose-life');
+      }
+
+      if (
+        state.lives !== hudRef.current.lives ||
+        state.score !== hudRef.current.score ||
+        state.gameOver !== hudRef.current.gameOver
+      ) {
+        hudRef.current = { lives: state.lives, score: state.score, gameOver: state.gameOver };
         setHud(hudRef.current);
       }
 
@@ -96,6 +202,11 @@ export default function PlayPage() {
       for (const enemy of state.enemies) {
         ctx.fillStyle = '#c84b31';
         ctx.fillRect(enemy.x, enemy.y, ENEMY_WIDTH, ENEMY_HEIGHT);
+      }
+
+      for (const collectible of state.collectibles) {
+        ctx.fillStyle = '#f3c969';
+        ctx.fillRect(collectible.x, collectible.y, COLLECTIBLE_SIZE, COLLECTIBLE_SIZE);
       }
 
       const shouldDrawPlayer = state.respawnTimer === 0 || Math.floor(timestamp / 100) % 2 === 0;
@@ -128,8 +239,16 @@ export default function PlayPage() {
       cancelAnimationFrame(rafId);
       window.removeEventListener('keydown', onKeyDown);
       window.removeEventListener('keyup', onKeyUp);
+      const audio = audioRef.current;
+      if (audio.musicTimer) {
+        window.clearInterval(audio.musicTimer);
+      }
+      if (audio.ctx) {
+        void audio.ctx.close();
+      }
+      audioRef.current = { ctx: null, masterGain: null, musicGain: null, musicTimer: null, melodyIndex: 0 };
     };
-  }, []);
+  }, [ensureAudio, playSfx]);
 
   return (
     <div
@@ -152,8 +271,24 @@ export default function PlayPage() {
           pointerEvents: 'none',
         }}
       >
-        Lives: {hud.lives}
+      Lives: {hud.lives}  Score: {hud.score}
       </div>
+      <button
+      type="button"
+      onClick={onToggleAudio}
+      style={{
+        position: 'absolute',
+        top: 16,
+        right: 16,
+        zIndex: 2,
+        fontFamily: 'monospace',
+        fontSize: 14,
+        padding: '6px 10px',
+        cursor: 'pointer',
+      }}
+      >
+      {muted ? 'Unmute' : 'Mute'}
+      </button>
       {hud.gameOver && (
         <div
           role="alert"
