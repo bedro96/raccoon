@@ -63,15 +63,16 @@ else
   fail "/api/scores returned HTTP ${SCORES_STATUS} (expected 200)"
 fi
 
-# Validate that the response body is a JSON array (may be empty)
+# Validate that the response body is a JSON object with a "scores" array
 if echo "$SCORES_BODY" | python3 -c "
 import sys, json
 data = json.load(sys.stdin)
-assert isinstance(data, list), f'expected list, got {type(data).__name__}'
+assert isinstance(data, dict), f'expected object, got {type(data).__name__}'
+assert isinstance(data.get('scores'), list), f'expected \"scores\" to be a list, got {type(data.get(\"scores\")).__name__}'
 " 2>/dev/null; then
-  pass "/api/scores response is a well-formed JSON array"
+  pass "/api/scores response is a well-formed JSON object with a \"scores\" array"
 else
-  fail "/api/scores response is NOT a well-formed JSON array"
+  fail "/api/scores response is NOT a well-formed JSON object with a \"scores\" array"
   echo "    Body (first 200 chars): ${SCORES_BODY:0:200}"
 fi
 
