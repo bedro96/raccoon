@@ -1,0 +1,12 @@
+name: ponpoko
+metadata:
+  template: containerapp
+infra:
+  provider: bicep
+services:
+  web:
+    project: .
+    language: js
+    host: containerapp
+    docker:
+      path: Dockerfile

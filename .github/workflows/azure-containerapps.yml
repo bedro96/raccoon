@@ -1,0 +1,80 @@
+name: Build and deploy to Azure Container Apps
+
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  id-token: write
+  contents: read
+
+env:
+  AZURE_ENV_NAME: ${{ vars.AZURE_ENV_NAME }}
+  AZURE_LOCATION: ${{ vars.AZURE_LOCATION }}
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Azure Developer CLI
+        uses: Azure/setup-azd@v2
+
+      - name: Azure login (OIDC)
+        uses: azure/login@v2
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Provision infrastructure
+        shell: bash
+        run: |
+          set -euo pipefail
+          if azd env select "$AZURE_ENV_NAME" >/dev/null 2>&1; then
+            echo "Using existing azd environment $AZURE_ENV_NAME"
+          else
+            azd env new "$AZURE_ENV_NAME" --no-prompt
+          fi
+          azd env set AZURE_LOCATION "$AZURE_LOCATION"
+          azd provision --no-prompt
+
+          eval "$(azd env get-values)"
+          echo "AZURE_RESOURCE_GROUP=$AZURE_RESOURCE_GROUP" >> "$GITHUB_ENV"
+
+      - name: Build and push image to ACR
+        shell: bash
+        run: |
+          set -euo pipefail
+          ACR_NAME=$(az resource list \
+            --resource-group "$AZURE_RESOURCE_GROUP" \
+            --resource-type Microsoft.ContainerRegistry/registries \
+            --query '[0].name' -o tsv)
+          ACR_LOGIN_SERVER=$(az acr show --name "$ACR_NAME" --resource-group "$AZURE_RESOURCE_GROUP" --query loginServer -o tsv)
+          IMAGE_TAG="$ACR_LOGIN_SERVER/ponpoko:${GITHUB_SHA}"
+
+          az acr login --name "$ACR_NAME"
+          docker build --file Dockerfile --tag "$IMAGE_TAG" .
+          docker push "$IMAGE_TAG"
+
+          echo "IMAGE_TAG=$IMAGE_TAG" >> "$GITHUB_ENV"
+
+      - name: Deploy new revision to Container Apps
+        shell: bash
+        run: |
+          set -euo pipefail
+          az extension add --name containerapp --upgrade --yes
+
+          CONTAINER_APP_NAME=$(az resource list \
+            --resource-group "$AZURE_RESOURCE_GROUP" \
+            --resource-type Microsoft.App/containerApps \
+            --query '[0].name' -o tsv)
+
+          az containerapp update \
+            --name "$CONTAINER_APP_NAME" \
+            --resource-group "$AZURE_RESOURCE_GROUP" \
+            --image "$IMAGE_TAG"
