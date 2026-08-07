@@ -79,7 +79,9 @@ export default function PlayPage() {
       const musicGain = ctx.createGain();
       musicGain.gain.value = 1;
       musicGain.connect(masterGain);
-      audioRef.current = { ...audioRef.current, ctx, masterGain, musicGain };
+      audio.ctx = ctx;
+      audio.masterGain = masterGain;
+      audio.musicGain = musicGain;
       startMelody();
     }
     if (audioRef.current.ctx?.state === 'suspended') {
@@ -242,6 +244,7 @@ export default function PlayPage() {
       const audio = audioRef.current;
       if (audio.musicTimer) {
         window.clearInterval(audio.musicTimer);
+        audio.musicTimer = null;
       }
       if (audio.ctx) {
         void audio.ctx.close();
@@ -271,23 +274,24 @@ export default function PlayPage() {
           pointerEvents: 'none',
         }}
       >
-      Lives: {hud.lives}  Score: {hud.score}
+        Lives: {hud.lives}
+        <span style={{ marginLeft: 12 }}>Score: {hud.score}</span>
       </div>
       <button
-      type="button"
-      onClick={onToggleAudio}
-      style={{
-        position: 'absolute',
-        top: 16,
-        right: 16,
-        zIndex: 2,
-        fontFamily: 'monospace',
-        fontSize: 14,
-        padding: '6px 10px',
-        cursor: 'pointer',
-      }}
+        type="button"
+        onClick={onToggleAudio}
+        style={{
+          position: 'absolute',
+          top: 16,
+          right: 16,
+          zIndex: 2,
+          fontFamily: 'monospace',
+          fontSize: 14,
+          padding: '6px 10px',
+          cursor: 'pointer',
+        }}
       >
-      {muted ? 'Unmute' : 'Mute'}
+        {muted ? 'Unmute' : 'Mute'}
       </button>
       {hud.gameOver && (
         <div
