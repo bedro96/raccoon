@@ -79,6 +79,7 @@ map at [issue #1](https://github.com/bedro96/raccoon/issues/1).
 The app is containerized with a multi-stage Dockerfile (Next.js `output: 'standalone'`) and deployed to
 **Azure Container Apps** via Azure Container Registry and a GitHub Actions CI/CD pipeline authenticated
 with OIDC federated credentials. See `docs/adr/0003-acr-azd-github-actions-deployment.md` for details.
+For one-time Azure/GitHub setup steps, see `docs/deployment/azure-oidc-setup.md`.
 
 ## Status
 
