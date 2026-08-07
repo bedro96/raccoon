@@ -18,7 +18,9 @@ describe('createInitialState', () => {
     expect(s.y).toBe(CANVAS_HEIGHT - PLAYER_HEIGHT);
     expect(s.onGround).toBe(true);
     expect(s.lives).toBe(INITIAL_LIVES);
+    expect(s.score).toBe(0);
     expect(s.enemies).toHaveLength(1);
+    expect(s.collectibles.length).toBeGreaterThan(0);
   });
 });
 
@@ -188,5 +190,43 @@ describe('update — enemies and lives', () => {
 
     expect(s2.lives).toBe(INITIAL_LIVES);
     expect(s2.gameOver).toBe(false);
+  });
+});
+
+describe('update — collectibles and score', () => {
+  it('increases score by the collectible value and removes the collected item', () => {
+    const s = createInitialState();
+    const collectible = s.collectibles[0];
+    const s2 = update(
+      {
+        ...s,
+        x: collectible.x,
+        y: collectible.y,
+        enemies: [{ ...s.enemies[0], x: 0, y: 0, vx: 0 }],
+      },
+      NO_INPUT,
+      0.016
+    );
+
+    expect(s2.score).toBe(100);
+    expect(s2.collectibles).toHaveLength(s.collectibles.length - 1);
+  });
+
+  it('does not change score without a genuine collection event', () => {
+    const s = createInitialState();
+    const collectible = s.collectibles[0];
+    const s2 = update(
+      {
+        ...s,
+        x: collectible.x - PLAYER_WIDTH,
+        y: collectible.y,
+        enemies: [{ ...s.enemies[0], x: 0, y: 0, vx: 0 }],
+      },
+      NO_INPUT,
+      0.016
+    );
+
+    expect(s2.score).toBe(0);
+    expect(s2.collectibles).toHaveLength(s.collectibles.length);
   });
 });
