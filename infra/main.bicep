@@ -110,7 +110,7 @@ resource containerApp 'Microsoft.App/containerApps@2024-03-01' = {
           name: 'ponpoko'
           image: containerImage
           resources: {
-            cpu: 0.5
+            cpu: json('0.5')
             memory: '1Gi'
           }
           env: [
