@@ -16,6 +16,8 @@ jobs:
   smoke-test:
     name: Run smoke test against production
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     # For workflow_run triggers, only run if the deployment succeeded
     if: >
       github.event_name == 'workflow_dispatch' ||
