@@ -27,7 +27,7 @@ jobs:
 
       - name: Run smoke test
         env:
-          BASE_URL: ${{ github.event.inputs.base_url || 'https://ca-ponpoko-eval.politecliff-3b621d61.koreacentral.azurecontainerapps.io' }}
+          BASE_URL: ${{ github.event.inputs.base_url || vars.PRODUCTION_URL || 'https://ca-ponpoko-eval.politecliff-3b621d61.koreacentral.azurecontainerapps.io' }}
         run: |
           chmod +x scripts/smoke-test.sh
           bash scripts/smoke-test.sh

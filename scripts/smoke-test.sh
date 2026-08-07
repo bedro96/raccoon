@@ -3,7 +3,7 @@
 # Usage: BASE_URL=https://... ./scripts/smoke-test.sh
 # Exit code 0 = all checks passed; non-zero = at least one check failed.
 
-set -uo pipefail
+set -euo pipefail
 
 BASE_URL="${BASE_URL:-https://ca-ponpoko-eval.politecliff-3b621d61.koreacentral.azurecontainerapps.io}"
 
@@ -20,11 +20,11 @@ http_get() {
   local url="$1"
   local tmpfile
   tmpfile=$(mktemp)
+  trap 'rm -f "$tmpfile"' RETURN
   local status
   status=$(curl -sS --max-time 20 -o "$tmpfile" -w "%{http_code}" "$url" 2>/dev/null) || status="000"
   local body
   body=$(cat "$tmpfile")
-  rm -f "$tmpfile"
   RESPONSE_STATUS="$status"
   RESPONSE_BODY="$body"
 }
