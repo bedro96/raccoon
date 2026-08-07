@@ -37,6 +37,49 @@ resource containerRegistry 'Microsoft.ContainerRegistry/registries@2023-07-01' =
   }
 }
 
+// This subscription enforces a tenant-level governance policy disabling public network access on
+// storage accounts (and shared-key auth) — a private endpoint is required, not just an RBAC-only
+// approach, so the Container Apps environment needs VNet integration to reach it privately.
+resource vnet 'Microsoft.Network/virtualNetworks@2023-09-01' = {
+  name: 'vnet-${normalizedEnvName}'
+  location: location
+  properties: {
+    addressSpace: {
+      addressPrefixes: [
+        '10.0.0.0/16'
+      ]
+    }
+  }
+}
+
+resource containerAppsSubnet 'Microsoft.Network/virtualNetworks/subnets@2023-09-01' = {
+  parent: vnet
+  name: 'snet-containerapps'
+  properties: {
+    addressPrefix: '10.0.0.0/23'
+    delegations: [
+      {
+        name: 'Microsoft.App.environments'
+        properties: {
+          serviceName: 'Microsoft.App/environments'
+        }
+      }
+    ]
+  }
+}
+
+resource privateEndpointSubnet 'Microsoft.Network/virtualNetworks/subnets@2023-09-01' = {
+  parent: vnet
+  name: 'snet-privateendpoints'
+  properties: {
+    addressPrefix: '10.0.2.0/24'
+    privateEndpointNetworkPolicies: 'Disabled'
+  }
+  dependsOn: [
+    containerAppsSubnet
+  ]
+}
+
 resource storageAccount 'Microsoft.Storage/storageAccounts@2023-05-01' = {
   name: storageAccountName
   location: location
@@ -61,6 +104,59 @@ resource leaderboardTable 'Microsoft.Storage/storageAccounts/tableServices/table
   name: 'Leaderboard'
 }
 
+resource tableStoragePrivateDnsZone 'Microsoft.Network/privateDnsZones@2024-06-01' = {
+  name: 'privatelink.table.${environment().suffixes.storage}'
+  location: 'global'
+}
+
+resource tableStoragePrivateDnsZoneVnetLink 'Microsoft.Network/privateDnsZones/virtualNetworkLinks@2024-06-01' = {
+  parent: tableStoragePrivateDnsZone
+  name: 'link-${normalizedEnvName}'
+  location: 'global'
+  properties: {
+    virtualNetwork: {
+      id: vnet.id
+    }
+    registrationEnabled: false
+  }
+}
+
+resource storageTablePrivateEndpoint 'Microsoft.Network/privateEndpoints@2023-09-01' = {
+  name: 'pe-table-${normalizedEnvName}'
+  location: location
+  properties: {
+    subnet: {
+      id: privateEndpointSubnet.id
+    }
+    privateLinkServiceConnections: [
+      {
+        name: 'pe-table-connection'
+        properties: {
+          privateLinkServiceId: storageAccount.id
+          groupIds: [
+            'table'
+          ]
+        }
+      }
+    ]
+  }
+}
+
+resource storageTablePrivateDnsZoneGroup 'Microsoft.Network/privateEndpoints/privateDnsZoneGroups@2023-09-01' = {
+  parent: storageTablePrivateEndpoint
+  name: 'default'
+  properties: {
+    privateDnsZoneConfigs: [
+      {
+        name: 'table'
+        properties: {
+          privateDnsZoneId: tableStoragePrivateDnsZone.id
+        }
+      }
+    ]
+  }
+}
+
 resource containerAppsEnvironment 'Microsoft.App/managedEnvironments@2024-03-01' = {
   name: containerAppsEnvironmentName
   location: location
@@ -71,6 +167,10 @@ resource containerAppsEnvironment 'Microsoft.App/managedEnvironments@2024-03-01'
         customerId: logAnalyticsWorkspace.properties.customerId
         sharedKey: listKeys(logAnalyticsWorkspace.id, logAnalyticsWorkspace.apiVersion).primarySharedKey
       }
+    }
+    vnetConfiguration: {
+      infrastructureSubnetId: containerAppsSubnet.id
+      internal: false
     }
   }
 }
