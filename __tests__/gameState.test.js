@@ -6,6 +6,7 @@ import {
   CANVAS_HEIGHT,
   PLAYER_WIDTH,
   PLAYER_HEIGHT,
+  INITIAL_LIVES,
 } from '../lib/gameState.js';
 
 const NO_INPUT = { left: false, right: false, up: false, down: false, jump: false };
@@ -16,6 +17,8 @@ describe('createInitialState', () => {
     expect(s.x).toBe(CANVAS_WIDTH / 2 - PLAYER_WIDTH / 2);
     expect(s.y).toBe(CANVAS_HEIGHT - PLAYER_HEIGHT);
     expect(s.onGround).toBe(true);
+    expect(s.lives).toBe(INITIAL_LIVES);
+    expect(s.enemies).toHaveLength(1);
   });
 });
 
@@ -128,5 +131,62 @@ describe('update — boundary conditions', () => {
     const s2 = update(s, NO_INPUT, 0.016);
     expect(s2.y).toBe(0);
     expect(s2.vy).toBe(0);
+  });
+});
+
+describe('update — enemies and lives', () => {
+  it('reduces lives by 1 and enters respawn recovery after a genuine collision', () => {
+    const s = createInitialState();
+    const s2 = update(s, NO_INPUT, 0.016);
+    const s3 = update(
+      {
+        ...s2,
+        x: s2.enemies[0].x,
+        y: s2.enemies[0].y,
+        enemies: [{ ...s2.enemies[0], vx: 0 }],
+      },
+      NO_INPUT,
+      0.016
+    );
+
+    expect(s3.lives).toBe(INITIAL_LIVES - 1);
+    expect(s3.respawnTimer).toBeGreaterThan(0);
+    expect(s3.x).toBe(s3.spawnX);
+    expect(s3.y).toBe(s3.spawnY);
+    expect(s3.gameOver).toBe(false);
+  });
+
+  it('sets game over when a collision drops lives to zero', () => {
+    const s = createInitialState();
+    const s2 = update(
+      {
+        ...s,
+        lives: 1,
+        x: s.enemies[0].x,
+        y: s.enemies[0].y,
+        enemies: [{ ...s.enemies[0], vx: 0 }],
+      },
+      NO_INPUT,
+      0.016
+    );
+
+    expect(s2.lives).toBe(0);
+    expect(s2.gameOver).toBe(true);
+  });
+
+  it('does not reduce lives when rectangles only touch edges without overlapping', () => {
+    const s = createInitialState();
+    const s2 = update(
+      {
+        ...s,
+        y: s.enemies[0].y,
+        enemies: [{ ...s.enemies[0], x: s.x + PLAYER_WIDTH, y: s.y, vx: 0 }],
+      },
+      NO_INPUT,
+      0.016
+    );
+
+    expect(s2.lives).toBe(INITIAL_LIVES);
+    expect(s2.gameOver).toBe(false);
   });
 });
