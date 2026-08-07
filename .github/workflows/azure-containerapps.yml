@@ -31,7 +31,7 @@ jobs:
           tenant-id: ${{ vars.AZURE_TENANT_ID }}
           subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
 
-      - name: Provision infrastructure
+      - name: Initialize azd environment
         shell: bash
         run: |
           set -euo pipefail
@@ -41,9 +41,12 @@ jobs:
             azd env new "$AZURE_ENV_NAME" --no-prompt
           fi
           azd env set AZURE_LOCATION "$AZURE_LOCATION"
-          azd provision --no-prompt
 
           eval "$(azd env get-values)"
+          if [ -z "${AZURE_RESOURCE_GROUP:-}" ]; then
+            azd provision --no-prompt
+            eval "$(azd env get-values)"
+          fi
           echo "AZURE_RESOURCE_GROUP=$AZURE_RESOURCE_GROUP" >> "$GITHUB_ENV"
 
       - name: Build and push image to ACR
@@ -61,20 +64,11 @@ jobs:
           docker build --file Dockerfile --tag "$IMAGE_TAG" .
           docker push "$IMAGE_TAG"
 
+          azd env set containerImage "$IMAGE_TAG"
           echo "IMAGE_TAG=$IMAGE_TAG" >> "$GITHUB_ENV"
 
-      - name: Deploy new revision to Container Apps
+      - name: Provision infrastructure and deploy image
         shell: bash
         run: |
           set -euo pipefail
-          az extension add --name containerapp --upgrade --yes
-
-          CONTAINER_APP_NAME=$(az resource list \
-            --resource-group "$AZURE_RESOURCE_GROUP" \
-            --resource-type Microsoft.App/containerApps \
-            --query '[0].name' -o tsv)
-
-          az containerapp update \
-            --name "$CONTAINER_APP_NAME" \
-            --resource-group "$AZURE_RESOURCE_GROUP" \
-            --image "$IMAGE_TAG"
+          azd provision --no-prompt

@@ -43,9 +43,9 @@ Push to `main` to trigger `.github/workflows/azure-containerapps.yml`.
 
 The workflow will:
 
-1. run `azd provision` to ensure infra exists,
+1. initialize/select the `azd` environment (bootstrapping infra once only if needed to create ACR),
 2. build and push the Docker image to ACR,
-3. update the Azure Container App to the new image.
+3. set `containerImage` in the `azd` environment and run `azd provision` to deploy that image.
 
 After success, fetch the production URL from the Container App:
 

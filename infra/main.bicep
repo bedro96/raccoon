@@ -4,6 +4,9 @@ param location string = resourceGroup().location
 @description('azd environment name')
 param environmentName string
 
+@description('Container image for the Container App')
+param containerImage string = 'mcr.microsoft.com/azuredocs/containerapps-helloworld:latest'
+
 var normalizedEnvName = replace(replace(toLower(environmentName), '_', '-'), '.', '-')
 var suffix = toLower(uniqueString(subscription().id, resourceGroup().id, normalizedEnvName))
 var containerRegistryName = 'acr${suffix}'
@@ -105,7 +108,7 @@ resource containerApp 'Microsoft.App/containerApps@2024-03-01' = {
       containers: [
         {
           name: 'ponpoko'
-          image: 'mcr.microsoft.com/azuredocs/containerapps-helloworld:latest'
+          image: containerImage
           resources: {
             cpu: 0.5
             memory: '1Gi'
