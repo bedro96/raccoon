@@ -35,6 +35,33 @@ npm test        # run the Vitest unit test suite
 npm run build   # production build (Next.js standalone output)
 ```
 
+## Container
+
+Build the production image from the repo root:
+
+```bash
+docker build -t ponpoko .
+```
+
+Run it locally on port 3000 with the default in-memory leaderboard:
+
+```bash
+docker run --rm -p 3000:3000 ponpoko
+```
+
+To use Azure Table Storage, pass the connection string at runtime:
+
+```bash
+docker run --rm -p 3000:3000 \
+  -e AZURE_STORAGE_CONNECTION_STRING="<your-connection-string>" \
+  ponpoko
+```
+
+The image runs the Next.js standalone server as a non-root user and reads runtime configuration such as
+`AZURE_STORAGE_CONNECTION_STRING` from environment variables passed to `docker run` rather than baking
+them into the image. If the connection string is omitted, the leaderboard falls back to the in-memory
+development storage implementation.
+
 ## Architecture & decisions
 
 This project's planning and architecture decisions were driven through a structured "Wayfinder" map
