@@ -11,6 +11,7 @@
     "lint": "eslint app/ __tests__/"
   },
   "dependencies": {
+    "@azure/data-tables": "^13.3.2",
     "next": "^16.3.0",
     "react": "^19.1.0",
     "react-dom": "^19.1.0"
