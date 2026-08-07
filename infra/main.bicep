@@ -77,12 +77,38 @@ resource containerAppsEnvironment 'Microsoft.App/managedEnvironments@2024-03-01'
 var storageAccountKey = listKeys(storageAccount.id, storageAccount.apiVersion).keys[0].value
 var storageConnectionString = 'DefaultEndpointsProtocol=https;AccountName=${storageAccount.name};AccountKey=${storageAccountKey};EndpointSuffix=${environment().suffixes.storage}'
 
+// A user-assigned identity (created and granted AcrPull ahead of the Container App) avoids a
+// chicken-and-egg RBAC race: a system-assigned identity only exists once the Container App itself
+// is created, so the AcrPull role assignment can't be granted until after — and Container Apps
+// validates registry credentials during revision activation, which then times out ("Operation
+// expired") waiting for a role assignment that can't exist yet in the same deployment.
+resource containerAppIdentity 'Microsoft.ManagedIdentity/userAssignedIdentities@2023-01-31' = {
+  name: 'id-${normalizedEnvName}'
+  location: location
+}
+
+resource acrPullRoleAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+  name: guid(containerRegistry.id, containerAppIdentity.id, 'AcrPull')
+  scope: containerRegistry
+  properties: {
+    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', '7f951dda-4ed3-4680-a7ca-43fe172d538d')
+    principalId: containerAppIdentity.properties.principalId
+    principalType: 'ServicePrincipal'
+  }
+}
+
 resource containerApp 'Microsoft.App/containerApps@2024-03-01' = {
   name: containerAppName
   location: location
   identity: {
-    type: 'SystemAssigned'
+    type: 'UserAssigned'
+    userAssignedIdentities: {
+      '${containerAppIdentity.id}': {}
+    }
   }
+  dependsOn: [
+    acrPullRoleAssignment
+  ]
   properties: {
     managedEnvironmentId: containerAppsEnvironment.id
     configuration: {
@@ -94,7 +120,7 @@ resource containerApp 'Microsoft.App/containerApps@2024-03-01' = {
       registries: [
         {
           server: containerRegistry.properties.loginServer
-          identity: 'system'
+          identity: containerAppIdentity.id
         }
       ]
       secrets: [
@@ -129,15 +155,6 @@ resource containerApp 'Microsoft.App/containerApps@2024-03-01' = {
   }
 }
 
-resource acrPullRoleAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
-  name: guid(containerRegistry.id, containerApp.id, 'AcrPull')
-  scope: containerRegistry
-  properties: {
-    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', '7f951dda-4ed3-4680-a7ca-43fe172d538d')
-    principalId: containerApp.identity.principalId
-    principalType: 'ServicePrincipal'
-  }
-}
 
 output containerRegistryName string = containerRegistry.name
 output containerRegistryLoginServer string = containerRegistry.properties.loginServer
