@@ -44,13 +44,33 @@ describe('update — movement', () => {
     const s = createInitialState();
     const s2 = update(s, { ...NO_INPUT, up: true }, 0.1);
     expect(s2.y).toBeLessThan(s.y);
+    // Climbing lifts the player off the ground
+    expect(s2.onGround).toBe(false);
+    expect(s2.isClimbing).toBe(true);
   });
 
   it('moves down when down input is active while on ground', () => {
     // Start the player above the floor so there is room to move down
-    const s = { ...createInitialState(), y: CANVAS_HEIGHT - PLAYER_HEIGHT - 20, onGround: true };
+    const s = { ...createInitialState(), y: CANVAS_HEIGHT - PLAYER_HEIGHT - 20, onGround: true, isClimbing: false };
     const s2 = update(s, { ...NO_INPUT, down: true }, 0.1);
     expect(s2.y).toBeGreaterThan(s.y);
+    expect(s2.isClimbing).toBe(true);
+  });
+
+  it('falls back to the ground after releasing Up while climbing mid-air', () => {
+    let s = createInitialState();
+    // Climb upward for a short time
+    for (let i = 0; i < 10; i++) {
+      s = update(s, { ...NO_INPUT, up: true }, 0.016);
+    }
+    expect(s.isClimbing).toBe(true);
+    expect(s.onGround).toBe(false);
+    // Release Up — player should fall due to gravity
+    for (let i = 0; i < 200; i++) {
+      s = update(s, NO_INPUT, 0.016);
+    }
+    expect(s.onGround).toBe(true);
+    expect(s.y).toBe(CANVAS_HEIGHT - PLAYER_HEIGHT);
   });
 });
 

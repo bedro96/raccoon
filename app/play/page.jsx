@@ -89,9 +89,15 @@ export default function PlayPage() {
       rafId = requestAnimationFrame(loop);
     };
 
-    sprite.onload = () => { rafId = requestAnimationFrame(loop); };
-    // If the image is already cached and decoded, onload won't fire — start immediately
-    if (sprite.complete) rafId = requestAnimationFrame(loop);
+    // Guard against duplicate loops when onload fires for an already-cached image
+    let started = false;
+    const startLoop = () => {
+      if (started) return;
+      started = true;
+      rafId = requestAnimationFrame(loop);
+    };
+    sprite.onload = startLoop;
+    if (sprite.complete) startLoop();
 
     return () => {
       cancelAnimationFrame(rafId);
