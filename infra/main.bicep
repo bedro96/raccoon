@@ -57,6 +57,7 @@ resource containerAppsSubnet 'Microsoft.Network/virtualNetworks/subnets@2023-09-
   name: 'snet-containerapps'
   properties: {
     addressPrefix: '10.0.0.0/23'
+    privateEndpointNetworkPolicies: 'Disabled'
     delegations: [
       {
         name: 'Microsoft.App.environments'
