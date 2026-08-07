@@ -8,7 +8,7 @@
     "build": "next build",
     "start": "next start",
     "test": "vitest run",
-    "lint": "next lint"
+    "lint": "eslint app/ __tests__/"
   },
   "dependencies": {
     "next": "^16.3.0",
