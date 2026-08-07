@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
+import LeaderboardOverlay from './LeaderboardOverlay.jsx';
 import {
   createInitialState,
   update,
@@ -23,6 +24,7 @@ export default function PlayPage() {
   const canvasRef = useRef(null);
   const hudRef = useRef(INITIAL_HUD);
   const [hud, setHud] = useState(INITIAL_HUD);
+  const [sessionToken, setSessionToken] = useState(null);
   const audioRef = useRef({ ctx: null, masterGain: null, musicGain: null, musicTimer: null, melodyIndex: 0 });
   const mutedRef = useRef(false);
   const [muted, setMuted] = useState(false);
@@ -111,6 +113,14 @@ export default function PlayPage() {
       void ensureAudio();
     }
   }, [ensureAudio, setAudioMuted]);
+
+  // Fetch a play-session token on mount so it is ready for score submission.
+  useEffect(() => {
+    fetch('/api/session')
+      .then((r) => r.json())
+      .then((data) => { setSessionToken(data.sessionToken); })
+      .catch(() => {});
+  }, []);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -295,23 +305,10 @@ export default function PlayPage() {
         {muted ? 'Unmute' : 'Mute'}
       </button>
       {hud.gameOver && (
-        <div
-          role="alert"
-          style={{
-            position: 'absolute',
-            inset: 0,
-            display: 'grid',
-            placeItems: 'center',
-            zIndex: 1,
-            color: '#fff',
-            fontFamily: 'monospace',
-            fontSize: 24,
-            backgroundColor: 'rgba(0, 0, 0, 0.45)',
-            pointerEvents: 'none',
-          }}
-        >
-          Game Over
-        </div>
+        <LeaderboardOverlay
+          score={hud.score}
+          sessionToken={sessionToken}
+        />
       )}
       <canvas
         ref={canvasRef}
