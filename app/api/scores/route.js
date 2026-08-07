@@ -31,13 +31,8 @@ export async function POST(request) {
     return NextResponse.json({ error: scoreResult.reason }, { status: 400 });
   }
 
-  // Validate session token (single-use — consumed here)
-  const tokenResult = consumeToken(sessionToken);
-  if (!tokenResult.ok) {
-    return NextResponse.json({ error: tokenResult.reason }, { status: 401 });
-  }
-
-  // Rate limiting by IP
+  // Rate-limit check before consuming the token so a rate-limited request
+  // does not burn the single-use token.
   const ip =
     request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ??
     request.headers.get('x-real-ip') ??
@@ -45,6 +40,12 @@ export async function POST(request) {
   const rateResult = checkRateLimit(ip);
   if (!rateResult.ok) {
     return NextResponse.json({ error: rateResult.reason }, { status: 429 });
+  }
+
+  // Validate session token (single-use — consumed here)
+  const tokenResult = consumeToken(sessionToken);
+  if (!tokenResult.ok) {
+    return NextResponse.json({ error: tokenResult.reason }, { status: 401 });
   }
 
   const entry = {
