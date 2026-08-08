@@ -1,9 +1,13 @@
 name: Build and deploy to Azure Container Apps
 
+# NOTE: Azure resources for this project were torn down (resource group rg-ponpoko-eval and the
+# ponpoko-github-oidc app registration deleted) after the evaluation concluded. This workflow's
+# trigger has been switched from automatic (push to main) to manual-only so a future commit does
+# not silently re-provision billable Azure infrastructure. To redeploy: recreate the app
+# registration + federated credential + role assignments (see docs/deployment/azure-oidc-setup.md)
+# and the GitHub repository variables, then run this workflow manually.
 on:
-  push:
-    branches:
-      - main
+  workflow_dispatch: {}
 
 permissions:
   id-token: write

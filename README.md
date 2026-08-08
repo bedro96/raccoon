@@ -92,4 +92,13 @@ For one-time Azure/GitHub setup steps, see `docs/deployment/azure-oidc-setup.md`
 
 This project was built as a sequence of tracer-bullet tickets (see issues #8–#15), each implemented by
 the GitHub Copilot coding agent and reviewed by a human/AI supervisory loop (automated tests + a
-rubber-duck logic review) before merging. Check the linked issues for current progress.
+rubber-duck logic review) before merging. All 8 tickets shipped and the app was deployed to Azure
+Container Apps and verified working end-to-end.
+
+**The Azure resources have since been torn down** (resource group `rg-ponpoko-eval` and the OIDC app
+registration were deleted after the evaluation concluded) — the production URL referenced in earlier
+commits/docs is no longer live. The CI/CD workflows (`.github/workflows/azure-containerapps.yml`,
+`.github/workflows/smoke-test.yml`) are now manual-dispatch only, so pushing to `main` will not
+recreate any billable Azure infrastructure. To redeploy, follow
+`docs/deployment/azure-oidc-setup.md` to recreate the app registration/federated credential and the
+required repository variables, then trigger the deploy workflow manually.

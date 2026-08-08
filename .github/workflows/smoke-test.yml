@@ -1,5 +1,8 @@
 name: Production Smoke Test
 
+# NOTE: the production Azure resources for this project (including the URL below) were torn down
+# after the evaluation concluded. This workflow will only run when manually triggered (or after the
+# deploy workflow, which is now also manual-only) and will fail until the app is redeployed.
 on:
   workflow_dispatch:
     inputs:
