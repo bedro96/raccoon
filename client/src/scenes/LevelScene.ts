@@ -13,11 +13,10 @@ import { getEnemyTextureKey, getItemRenderConfig } from "../game/spriteSelection
 import type { ItemData, MapData } from "../game/types";
 
 /**
- * The two levels actually loaded by the original single-player game, in
- * original order (see "Reverse-engineer..." -- stage.map/level1.map/level2.map
- * are confirmed unused editor artifacts; only these two are real).
+ * The original two shipped levels, followed by our new custom third level.
+ * stage.map/level1.map/level2.map remain confirmed unused editor artifacts.
  */
-const LEVEL_URLS = ["/assets/levels/stage1.map", "/assets/levels/stage2.map"];
+const LEVEL_URLS = ["/assets/levels/stage1.map", "/assets/levels/stage2.map", "/assets/levels/stage3.map"];
 
 // Display sizes (px). Original size for these was 24x24; enemy and CARROT
 // (item1) are rendered 50% larger per explicit request for visibility.
