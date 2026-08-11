@@ -17,7 +17,7 @@ export function getRowY(rowIndex: number): number {
 }
 
 // Player movement (PlayerSession.h)
-export const MOVE_STEP = 6.0; // px per key-event in the original; we apply this per-frame at 60fps (see PlayerController)
+export const MOVE_STEP = 5.4; // px per key-event; 10% slower than the original's 6.0px, per explicit request (deliberate deviation from exact-replica fidelity)
 export const LADDER_TOLERANCE = 20.0; // px, max distance from ladder center to mount
 export const PICKUP_RADIUS = 20.0; // px, item/spike/enemy hazard detection radius
 export const FLOOR_LEFT_BOUND = 20.0;

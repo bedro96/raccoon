@@ -11,6 +11,14 @@ import type { ItemData, MapData } from "../game/types";
  */
 const LEVEL_URLS = ["/assets/levels/stage1.map", "/assets/levels/stage2.map"];
 
+// Display sizes (px). Original size for these was 24x24; enemy and CARROT
+// (item1) are rendered 50% larger per explicit request for visibility.
+// CHERRY (item2) is left at its original size. 36px still comfortably clears
+// the 120px row spacing, so there's no overlap with adjacent platforms.
+const ENEMY_DISPLAY_SIZE = 36;
+const CARROT_DISPLAY_SIZE = 36;
+const CHERRY_DISPLAY_SIZE = 24;
+
 /**
  * Full playable level scene: loads a real level, renders it, and drives the
  * complete original gameplay loop -- movement, item pickup, spike/enemy
@@ -34,6 +42,15 @@ export class LevelScene extends Phaser.Scene {
   private scoreText?: Phaser.GameObjects.Text;
   private itemSprites = new Map<ItemData, Phaser.GameObjects.Image>();
   private gameComplete = false;
+  private completionText?: Phaser.GameObjects.Text;
+  private restartButton?: Phaser.GameObjects.Text;
+  /**
+   * Guards against a stale in-flight loadLevel() (e.g. the auto-advance to
+   * Level 2) resolving *after* a newer one (e.g. a Restart back to Level 1)
+   * and clobbering the scene state it already settled. Each call captures
+   * its own token and only applies its result if it's still the latest.
+   */
+  private loadGeneration = 0;
 
   constructor() {
     super("LevelScene");
@@ -75,11 +92,47 @@ export class LevelScene extends Phaser.Scene {
       this.flashRespawn();
     };
 
+    this.createRestartButton();
+
+    void this.loadLevel(this.levelIndex);
+  }
+
+  private createRestartButton(): void {
+    this.restartButton = this.add
+      .text(this.scale.width - 16, 16, "Restart", {
+        fontFamily: "monospace",
+        fontSize: "18px",
+        color: "#ffffff",
+        backgroundColor: "#333333",
+        padding: { x: 10, y: 6 },
+      })
+      .setOrigin(1, 0) // anchor top-right, so it stays pinned to the corner
+      .setDepth(1000) // always render above level geometry/sprites
+      .setInteractive({ useHandCursor: true })
+      .on("pointerover", () => this.restartButton?.setBackgroundColor("#555555"))
+      .on("pointerout", () => this.restartButton?.setBackgroundColor("#333333"))
+      .on("pointerdown", () => this.restartGame());
+  }
+
+  /** Resets the game back to the start of Level 1 -- score, items, and player state all cleared. */
+  private restartGame(): void {
+    this.gameComplete = false;
+    this.completionText?.destroy();
+    this.completionText = undefined;
+    this.playerSprite?.setVisible(true);
+    this.levelIndex = 0;
+    this.currentMap = null; // pause updates while Level 1 reloads
     void this.loadLevel(this.levelIndex);
   }
 
   private async loadLevel(index: number): Promise<void> {
+    const generation = ++this.loadGeneration;
     const map = await loadMapData(LEVEL_URLS[index]);
+
+    // A newer loadLevel() call (e.g. Restart) started after this one -- discard
+    // this stale result instead of clobbering state the newer call already settled.
+    if (generation !== this.loadGeneration) return;
+
     this.currentMap = map;
 
     this.loadingText?.destroy();
@@ -129,15 +182,18 @@ export class LevelScene extends Phaser.Scene {
 
     for (const item of map.items) {
       const key = item.type === "CARROT" ? "item1" : "item2";
-      const img = this.add.image(item.x, item.y - 12, key);
-      img.setDisplaySize(24, 24);
+      // CARROT is rendered larger per explicit request; CHERRY (item2) keeps
+      // its original size for now.
+      const size = item.type === "CARROT" ? CARROT_DISPLAY_SIZE : CHERRY_DISPLAY_SIZE;
+      const img = this.add.image(item.x, item.y - size / 2, key);
+      img.setDisplaySize(size, size);
       container.add(img);
       this.itemSprites.set(item, img);
     }
 
     for (const enemy of map.enemies) {
-      const img = this.add.image(enemy.x, enemy.y - 12, "enemy");
-      img.setDisplaySize(24, 24);
+      const img = this.add.image(enemy.x, enemy.y - ENEMY_DISPLAY_SIZE / 2, "enemy");
+      img.setDisplaySize(ENEMY_DISPLAY_SIZE, ENEMY_DISPLAY_SIZE);
       container.add(img);
     }
 
@@ -153,7 +209,7 @@ export class LevelScene extends Phaser.Scene {
   private showGameComplete(): void {
     this.gameComplete = true;
     this.playerSprite?.setVisible(false);
-    this.add
+    this.completionText = this.add
       .text(this.scale.width / 2, this.scale.height / 2, `GAME COMPLETE\nFinal score: ${this.player.score}`, {
         fontFamily: "monospace",
         fontSize: "32px",
@@ -172,7 +228,10 @@ export class LevelScene extends Phaser.Scene {
     this.player.update(deltaSeconds, this.currentMap);
 
     this.playerSprite.setPosition(this.player.x, this.player.getRenderY());
-    this.playerSprite.setFlipX(this.player.facingDir < 0);
+    // The character sprite's native art faces left, so mirror it only when
+    // facing/moving right (facingDir > 0) -- previously inverted, causing the
+    // sprite to face backward while walking and during the jump arc.
+    this.playerSprite.setFlipX(this.player.facingDir > 0);
 
     // Ported from CUISingleGame::OnUpdate: once every item on the current
     // level is collected, advance to the next level (or finish, on the last one).
