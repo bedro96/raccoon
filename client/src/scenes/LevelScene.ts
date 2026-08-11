@@ -3,6 +3,11 @@ import { PlayerController, type InputType } from "../game/PlayerController";
 import { getRowY, CEILING_Y, FLOOR_Y, PLATFORM_ROW_COUNT, GAME_WIDTH } from "../game/constants";
 import { getEnemyPatrolX } from "../game/enemyPatrol";
 import { loadMapData } from "../game/mapLoader";
+import {
+  buildRespawnBlinkSequence,
+  RESPAWN_BLINK_COUNT,
+  RESPAWN_BLINK_INTERVAL_MS,
+} from "../game/respawnBlink";
 import type { ItemData, MapData } from "../game/types";
 
 /**
@@ -47,6 +52,7 @@ export class LevelScene extends Phaser.Scene {
   private completionText?: Phaser.GameObjects.Text;
   private restartButton?: Phaser.GameObjects.Text;
   private levelElapsedSeconds = 0;
+  private respawnBlinkTimers: Phaser.Time.TimerEvent[] = [];
   /**
    * Guards against a stale in-flight loadLevel() (e.g. the auto-advance to
    * Level 2) resolving *after* a newer one (e.g. a Restart back to Level 1)
@@ -92,7 +98,7 @@ export class LevelScene extends Phaser.Scene {
       this.scoreText?.setText(`Score: ${this.player.score}`);
     };
     this.player.onHazardHit = () => {
-      this.flashRespawn();
+      this.blinkRespawn();
     };
 
     this.createRestartButton();
@@ -122,7 +128,7 @@ export class LevelScene extends Phaser.Scene {
     this.gameComplete = false;
     this.completionText?.destroy();
     this.completionText = undefined;
-    this.playerSprite?.setVisible(true);
+    this.clearRespawnBlink();
     this.levelIndex = 0;
     this.currentMap = null; // pause updates while Level 1 reloads
     void this.loadLevel(this.levelIndex);
@@ -145,6 +151,7 @@ export class LevelScene extends Phaser.Scene {
 
     this.loadingText?.destroy();
     this.loadingText = undefined;
+    this.clearRespawnBlink();
     this.geometryLayer?.destroy();
     this.itemSprites.clear();
     this.enemySprites.clear();
@@ -211,14 +218,30 @@ export class LevelScene extends Phaser.Scene {
     return container;
   }
 
-  private flashRespawn(): void {
+  private clearRespawnBlink(): void {
+    if (this.respawnBlinkTimers.length > 0) {
+      this.time.removeEvent(this.respawnBlinkTimers);
+      this.respawnBlinkTimers = [];
+    }
+    this.playerSprite?.setVisible(true);
+  }
+
+  private blinkRespawn(): void {
     if (!this.playerSprite) return;
-    this.playerSprite.setTint(0xff0000);
-    this.time.delayedCall(150, () => this.playerSprite?.clearTint());
+
+    this.clearRespawnBlink();
+    this.playerSprite.setVisible(false);
+
+    this.respawnBlinkTimers = buildRespawnBlinkSequence(RESPAWN_BLINK_COUNT, RESPAWN_BLINK_INTERVAL_MS).map((step) =>
+      this.time.delayedCall(step.delayMs, () => {
+        this.playerSprite?.setVisible(step.visible);
+      }),
+    );
   }
 
   private showGameComplete(): void {
     this.gameComplete = true;
+    this.clearRespawnBlink();
     this.playerSprite?.setVisible(false);
     this.completionText = this.add
       .text(this.scale.width / 2, this.scale.height / 2, `GAME COMPLETE\nFinal score: ${this.player.score}`, {
