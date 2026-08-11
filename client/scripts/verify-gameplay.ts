@@ -56,20 +56,20 @@ function baseMap(): MapData {
   assertTrue("onHazardHit callback fired for spike", hazardFired);
 }
 
-// 3. Enemy hazard: uses spawn position, not any animated/tick-based position
-// (replicates the original's confirmed CheckPickupAndHazards quirk -- see the
-// map's "Not yet specified" resolution on this ticket).
+// 3. Enemy hazard: follows the enemy's live/current position, even when the
+// player is standing still and the enemy moves onto them.
 {
   const map = baseMap();
-  map.enemies.push({ x: 105, y: FLOOR_Y, patrolRange: 50 }); // patrolRange is irrelevant to collision, by design
+  map.enemies.push({ x: 300, y: FLOOR_Y, patrolRange: 50, currentX: 110, currentY: FLOOR_Y });
   const p = new PlayerController();
   p.reset(map.startPos, 4);
+  p.x = 110;
   let hazardFired = false;
   p.onHazardHit = () => (hazardFired = true);
 
-  p.applyInput("MoveRight", map);
+  p.checkHazards(map);
 
-  assertTrue("Enemy hazard (at spawn position) triggers respawn", p.x === map.startPos.x);
+  assertTrue("Enemy hazard (at live/current position) triggers respawn", p.x === map.startPos.x);
   assertTrue("onHazardHit callback fired for enemy", hazardFired);
 }
 

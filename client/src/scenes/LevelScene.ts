@@ -1,6 +1,7 @@
 import Phaser from "phaser";
 import { PlayerController, type InputType } from "../game/PlayerController";
 import { getRowY, CEILING_Y, FLOOR_Y, PLATFORM_ROW_COUNT, GAME_WIDTH } from "../game/constants";
+import { getEnemyPatrolX } from "../game/enemyPatrol";
 import { loadMapData } from "../game/mapLoader";
 import type { ItemData, MapData } from "../game/types";
 
@@ -41,9 +42,11 @@ export class LevelScene extends Phaser.Scene {
   private loadingText?: Phaser.GameObjects.Text;
   private scoreText?: Phaser.GameObjects.Text;
   private itemSprites = new Map<ItemData, Phaser.GameObjects.Image>();
+  private enemySprites = new Map<MapData["enemies"][number], Phaser.GameObjects.Image>();
   private gameComplete = false;
   private completionText?: Phaser.GameObjects.Text;
   private restartButton?: Phaser.GameObjects.Text;
+  private levelElapsedSeconds = 0;
   /**
    * Guards against a stale in-flight loadLevel() (e.g. the auto-advance to
    * Level 2) resolving *after* a newer one (e.g. a Restart back to Level 1)
@@ -134,11 +137,17 @@ export class LevelScene extends Phaser.Scene {
     if (generation !== this.loadGeneration) return;
 
     this.currentMap = map;
+    this.levelElapsedSeconds = 0;
+    for (const enemy of map.enemies) {
+      enemy.currentX = enemy.x;
+      enemy.currentY = enemy.y;
+    }
 
     this.loadingText?.destroy();
     this.loadingText = undefined;
     this.geometryLayer?.destroy();
     this.itemSprites.clear();
+    this.enemySprites.clear();
     this.geometryLayer = this.drawGeometry(map);
 
     this.player.reset(map.startPos, PLATFORM_ROW_COUNT);
@@ -192,9 +201,10 @@ export class LevelScene extends Phaser.Scene {
     }
 
     for (const enemy of map.enemies) {
-      const img = this.add.image(enemy.x, enemy.y - ENEMY_DISPLAY_SIZE / 2, "enemy");
+      const img = this.add.image(enemy.currentX ?? enemy.x, (enemy.currentY ?? enemy.y) - ENEMY_DISPLAY_SIZE / 2, "enemy");
       img.setDisplaySize(ENEMY_DISPLAY_SIZE, ENEMY_DISPLAY_SIZE);
       container.add(img);
+      this.enemySprites.set(enemy, img);
     }
 
     return container;
@@ -219,13 +229,27 @@ export class LevelScene extends Phaser.Scene {
       .setOrigin(0.5);
   }
 
+  private updateEnemies(map: MapData): void {
+    for (const enemy of map.enemies) {
+      enemy.currentX = getEnemyPatrolX(enemy.x, enemy.patrolRange, this.levelElapsedSeconds);
+      enemy.currentY = enemy.y;
+      this.enemySprites
+        .get(enemy)
+        ?.setPosition(enemy.currentX, enemy.currentY - ENEMY_DISPLAY_SIZE / 2);
+    }
+  }
+
   update(_time: number, deltaMs: number): void {
     if (this.gameComplete || !this.currentMap) return; // still loading, or finished
 
     const deltaSeconds = deltaMs / 1000;
+    this.levelElapsedSeconds += deltaSeconds;
+    this.updateEnemies(this.currentMap);
+
     const input = this.readInput();
     if (input !== "None") this.player.applyInput(input, this.currentMap);
     this.player.update(deltaSeconds, this.currentMap);
+    this.player.checkHazards(this.currentMap);
 
     this.playerSprite.setPosition(this.player.x, this.player.getRenderY());
     // The character sprite's native art faces left, so mirror it only when

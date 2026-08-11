@@ -8,7 +8,8 @@
     "build": "tsc && vite build",
     "preview": "vite preview",
     "verify:physics": "tsx scripts/verify-physics.ts",
-    "verify:gameplay": "tsx scripts/verify-gameplay.ts"
+    "verify:gameplay": "tsx scripts/verify-gameplay.ts",
+    "verify:enemy-patrol": "tsx scripts/verify-enemy-patrol.ts"
   },
   "devDependencies": {
     "tsx": "^4.23.12",

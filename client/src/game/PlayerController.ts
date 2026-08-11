@@ -92,20 +92,7 @@ export class PlayerController {
     this.transitionToRow = toRow;
   }
 
-  /**
-   * Item pickup / spike / enemy hazard detection, ported from
-   * CPlayerSession::CheckPickupAndHazards. Same row + proximity model as
-   * platform/ladder detection (PICKUP_RADIUS, same constant as
-   * LADDER_TOLERANCE in the original).
-   *
-   * Enemy collision uses the enemy's spawn position (map.enemies[].x/y)
-   * rather than its animated patrol position -- this is a confirmed
-   * quirk/simplification in the original (CheckPickupAndHazards never
-   * passes a tick to GetCurrentX), and per the map's decision it is
-   * replicated faithfully here rather than "fixed", since the destination
-   * is a faithful reimplementation.
-   */
-  private checkPickupAndHazards(map: MapData): void {
+  private checkItemPickup(map: MapData): void {
     const rowY = getRowY(this.row);
 
     const itemIndex = map.items.findIndex((item) => item.y === rowY && Math.abs(item.x - this.x) <= PICKUP_RADIUS);
@@ -114,6 +101,10 @@ export class PlayerController {
       this.score += item.score;
       this.onItemPickup?.(item);
     }
+  }
+
+  private checkHazardsInternal(map: MapData): void {
+    const rowY = getRowY(this.row);
 
     for (const spike of map.spikes) {
       if (spike.y === rowY && Math.abs(spike.x - this.x) <= PICKUP_RADIUS) {
@@ -124,12 +115,25 @@ export class PlayerController {
     }
 
     for (const enemy of map.enemies) {
-      if (enemy.y === rowY && Math.abs(enemy.x - this.x) <= PICKUP_RADIUS) {
+      const enemyX = enemy.currentX ?? enemy.x;
+      const enemyY = enemy.currentY ?? enemy.y;
+      if (enemyY === rowY && Math.abs(enemyX - this.x) <= PICKUP_RADIUS) {
         this.respawn();
         this.onHazardHit?.();
         return;
       }
     }
+  }
+
+  private checkPickupAndHazards(map: MapData): void {
+    this.checkItemPickup(map);
+    this.checkHazardsInternal(map);
+  }
+
+  /** Re-check hazards against the player's current position, even if the player is idle. */
+  checkHazards(map: MapData): void {
+    if (this.jumping || this.rowTransition) return;
+    this.checkHazardsInternal(map);
   }
 
   applyInput(input: InputType, map: MapData): void {

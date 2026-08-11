@@ -35,6 +35,8 @@ export interface EnemyData {
   x: number;
   y: number;
   patrolRange: number;
+  currentX?: number;
+  currentY?: number;
 }
 
 export interface MapData {
