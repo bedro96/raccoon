@@ -9,6 +9,7 @@ import {
   RESPAWN_BLINK_INTERVAL_MS,
   getRespawnBlinkDuration,
 } from "../game/respawnBlink";
+import { getEnemyTextureKey, getItemRenderConfig } from "../game/spriteSelection";
 import type { ItemData, MapData } from "../game/types";
 
 /**
@@ -80,18 +81,15 @@ export class LevelScene extends Phaser.Scene {
   }
 
   private getEnemyTextureKey(): "enemy" | "wolf" {
-    return this.levelIndex >= 2 ? "wolf" : "enemy";
+    return getEnemyTextureKey(this.levelIndex);
   }
 
   private getItemRenderConfig(item: ItemData): { key: "item1" | "item2" | "item3"; size: number } {
-    switch (item.type) {
-      case "CARROT":
-        return { key: "item1", size: CARROT_DISPLAY_SIZE };
-      case "CHERRY":
-        return { key: "item2", size: CHERRY_DISPLAY_SIZE };
-      case "BANANA":
-        return { key: "item3", size: BANANA_DISPLAY_SIZE };
-    }
+    return getItemRenderConfig(item, {
+      carrot: CARROT_DISPLAY_SIZE,
+      cherry: CHERRY_DISPLAY_SIZE,
+      banana: BANANA_DISPLAY_SIZE,
+    });
   }
 
   create(): void {

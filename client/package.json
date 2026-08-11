@@ -11,7 +11,8 @@
     "verify:physics": "tsx scripts/verify-physics.ts",
     "verify:gameplay": "tsx scripts/verify-gameplay.ts",
     "verify:enemy-patrol": "tsx scripts/verify-enemy-patrol.ts",
-    "verify:jump-rotation": "tsx scripts/verify-jump-rotation.ts"
+    "verify:jump-rotation": "tsx scripts/verify-jump-rotation.ts",
+    "verify:wolf-banana": "tsx scripts/verify-wolf-banana.ts"
   },
   "devDependencies": {
     "tsx": "^4.23.12",

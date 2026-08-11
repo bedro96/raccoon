@@ -1,11 +1,15 @@
 /**
  * Deterministic verification for issue #46's map-loader extension:
  * eType=2 must decode to BANANA while preserving the item's score payload.
+ * Also covers the pure sprite-selection helpers used by LevelScene to pick
+ * the enemy (enemy vs. wolf, by level index) and item (carrot/cherry/banana)
+ * texture keys.
  *
  * Run with: npx tsx scripts/verify-wolf-banana.ts
  */
 import { FLOOR_LEFT_BOUND, FLOOR_Y } from "../src/game/constants";
 import { parseMapData } from "../src/game/mapLoader";
+import { getEnemyTextureKey, getItemRenderConfig } from "../src/game/spriteSelection";
 
 let failures = 0;
 
@@ -51,6 +55,21 @@ assertTrue("Parser keeps exactly one item", map.items.length === 1);
 assertTrue("eType=2 decodes to BANANA", map.items[0]?.type === "BANANA");
 assertTrue("BANANA score is preserved from nScore", map.items[0]?.score === 30);
 assertTrue("Out-of-bounds spawn X still uses the existing clamp", map.startPos.x === FLOOR_LEFT_BOUND);
+
+// --- Enemy sprite selection (level-based, not per-enemy) ---
+assertTrue("Level 1 (index 0) uses the original enemy sprite", getEnemyTextureKey(0) === "enemy");
+assertTrue("Level 2 (index 1) uses the original enemy sprite", getEnemyTextureKey(1) === "enemy");
+assertTrue("Level 3 (index 2) uses the wolf sprite", getEnemyTextureKey(2) === "wolf");
+assertTrue("Level 4 (index 3) uses the wolf sprite", getEnemyTextureKey(3) === "wolf");
+
+// --- Item sprite/size selection ---
+const sizes = { carrot: 36, cherry: 24, banana: 36 };
+const carrotConfig = getItemRenderConfig({ type: "CARROT" }, sizes);
+const cherryConfig = getItemRenderConfig({ type: "CHERRY" }, sizes);
+const bananaConfig = getItemRenderConfig({ type: "BANANA" }, sizes);
+assertTrue("CARROT renders as item1", carrotConfig.key === "item1" && carrotConfig.size === 36);
+assertTrue("CHERRY renders as item2", cherryConfig.key === "item2" && cherryConfig.size === 24);
+assertTrue("BANANA renders as item3", bananaConfig.key === "item3" && bananaConfig.size === 36);
 
 console.log("");
 if (failures > 0) {
