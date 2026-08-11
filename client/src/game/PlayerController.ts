@@ -9,10 +9,11 @@ import {
   JUMP_HEIGHT,
   LADDER_TOLERANCE,
   MOVE_STEP,
+  PICKUP_RADIUS,
   PLATFORM_ROW_COUNT,
   getRowY,
 } from "./constants";
-import type { MapData } from "./types";
+import type { ItemData, MapData } from "./types";
 
 export type InputType = "MoveLeft" | "MoveRight" | "ClimbUp" | "ClimbDown" | "Jump" | "None";
 
@@ -43,6 +44,11 @@ export class PlayerController {
 
   private startX = 0;
   private startRow = 0;
+
+  /** Fired when the player picks up an item (score already applied). */
+  onItemPickup?: (item: ItemData) => void;
+  /** Fired when the player is respawned after hitting a spike or enemy. */
+  onHazardHit?: () => void;
 
   reset(startPos: { x: number; y: number }, startRow: number): void {
     this.startX = startPos.x;
@@ -86,6 +92,46 @@ export class PlayerController {
     this.transitionToRow = toRow;
   }
 
+  /**
+   * Item pickup / spike / enemy hazard detection, ported from
+   * CPlayerSession::CheckPickupAndHazards. Same row + proximity model as
+   * platform/ladder detection (PICKUP_RADIUS, same constant as
+   * LADDER_TOLERANCE in the original).
+   *
+   * Enemy collision uses the enemy's spawn position (map.enemies[].x/y)
+   * rather than its animated patrol position -- this is a confirmed
+   * quirk/simplification in the original (CheckPickupAndHazards never
+   * passes a tick to GetCurrentX), and per the map's decision it is
+   * replicated faithfully here rather than "fixed", since the destination
+   * is a faithful reimplementation.
+   */
+  private checkPickupAndHazards(map: MapData): void {
+    const rowY = getRowY(this.row);
+
+    const itemIndex = map.items.findIndex((item) => item.y === rowY && Math.abs(item.x - this.x) <= PICKUP_RADIUS);
+    if (itemIndex !== -1) {
+      const [item] = map.items.splice(itemIndex, 1);
+      this.score += item.score;
+      this.onItemPickup?.(item);
+    }
+
+    for (const spike of map.spikes) {
+      if (spike.y === rowY && Math.abs(spike.x - this.x) <= PICKUP_RADIUS) {
+        this.respawn();
+        this.onHazardHit?.();
+        return;
+      }
+    }
+
+    for (const enemy of map.enemies) {
+      if (enemy.y === rowY && Math.abs(enemy.x - this.x) <= PICKUP_RADIUS) {
+        this.respawn();
+        this.onHazardHit?.();
+        return;
+      }
+    }
+  }
+
   applyInput(input: InputType, map: MapData): void {
     if ((this.jumping || this.rowTransition) && input !== "None") return;
 
@@ -121,6 +167,10 @@ export class PlayerController {
       default:
         break;
     }
+
+    if (input === "MoveLeft" || input === "MoveRight") {
+      this.checkPickupAndHazards(map);
+    }
   }
 
   update(deltaSeconds: number, map: MapData): void {
@@ -143,6 +193,7 @@ export class PlayerController {
           return;
         }
         this.falling = false;
+        this.checkPickupAndHazards(map);
       }
       return;
     }
@@ -162,7 +213,9 @@ export class PlayerController {
 
       if (!this.tryGetPlatformBounds(map, this.x)) {
         this.startRowTransition(this.row + 1, true);
+        return;
       }
+      this.checkPickupAndHazards(map);
       return;
     }
 

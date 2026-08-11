@@ -2,36 +2,38 @@ import Phaser from "phaser";
 import { PlayerController, type InputType } from "../game/PlayerController";
 import { getRowY, CEILING_Y, FLOOR_Y, PLATFORM_ROW_COUNT, GAME_WIDTH } from "../game/constants";
 import { loadMapData } from "../game/mapLoader";
-import type { MapData } from "../game/types";
+import type { ItemData, MapData } from "../game/types";
 
 /**
- * The two levels actually loaded by the original single-player game
- * (see the "Reverse-engineer..." ticket -- stage.map/level1.map/level2.map
+ * The two levels actually loaded by the original single-player game, in
+ * original order (see "Reverse-engineer..." -- stage.map/level1.map/level2.map
  * are confirmed unused editor artifacts; only these two are real).
  */
 const LEVEL_URLS = ["/assets/levels/stage1.map", "/assets/levels/stage2.map"];
 
 /**
- * Renders a real, loaded level (platforms, ladders, and item/spike/enemy
- * placement) and lets the player move around it with the ported physics.
- * Item pickup, spike/enemy hazards, and level-advance behavior are NOT
- * implemented here -- that's "Implement enemies, spikes, items, and
- * level-advance win condition". This scene only proves the loader + core
- * movement integrate correctly against real level data.
+ * Full playable level scene: loads a real level, renders it, and drives the
+ * complete original gameplay loop -- movement, item pickup, spike/enemy
+ * hazards (respawn on contact), and level-advance once every item on the
+ * current level is collected. Ported from CUISingleGame::OnUpdate's
+ * `if (m_MapData.Items.empty()) { ... }` check.
  *
- * Press 'N' to manually cycle to the next level (a stand-in for the real
- * win-condition-triggered advance, which ticket #29 implements).
+ * The original ends a 2-level playthrough by returning to a lobby; per the
+ * map's "no menu/title screen" decision, there is no lobby here, so
+ * finishing the last level shows a brief completion message instead.
  */
 export class LevelScene extends Phaser.Scene {
   private player = new PlayerController();
   private cursors!: Phaser.Types.Input.Keyboard.CursorKeys;
   private spaceKey!: Phaser.Input.Keyboard.Key;
-  private nextLevelKey!: Phaser.Input.Keyboard.Key;
   private playerSprite!: Phaser.GameObjects.Sprite;
   private levelIndex = 0;
   private currentMap: MapData | null = null;
   private geometryLayer?: Phaser.GameObjects.Container;
   private loadingText?: Phaser.GameObjects.Text;
+  private scoreText?: Phaser.GameObjects.Text;
+  private itemSprites = new Map<ItemData, Phaser.GameObjects.Image>();
+  private gameComplete = false;
 
   constructor() {
     super("LevelScene");
@@ -49,7 +51,6 @@ export class LevelScene extends Phaser.Scene {
   create(): void {
     this.cursors = this.input.keyboard!.createCursorKeys();
     this.spaceKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE);
-    this.nextLevelKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.N);
 
     this.loadingText = this.add
       .text(this.scale.width / 2, this.scale.height / 2, "Loading level…", {
@@ -59,6 +60,21 @@ export class LevelScene extends Phaser.Scene {
       })
       .setOrigin(0.5);
 
+    this.scoreText = this.add.text(16, 16, "Score: 0", {
+      fontFamily: "monospace",
+      fontSize: "20px",
+      color: "#ffffff",
+    });
+
+    this.player.onItemPickup = (item) => {
+      this.itemSprites.get(item)?.destroy();
+      this.itemSprites.delete(item);
+      this.scoreText?.setText(`Score: ${this.player.score}`);
+    };
+    this.player.onHazardHit = () => {
+      this.flashRespawn();
+    };
+
     void this.loadLevel(this.levelIndex);
   }
 
@@ -67,15 +83,19 @@ export class LevelScene extends Phaser.Scene {
     this.currentMap = map;
 
     this.loadingText?.destroy();
+    this.loadingText = undefined;
     this.geometryLayer?.destroy();
+    this.itemSprites.clear();
     this.geometryLayer = this.drawGeometry(map);
 
     this.player.reset(map.startPos, PLATFORM_ROW_COUNT);
+    this.scoreText?.setText(`Score: ${this.player.score}`);
     if (!this.playerSprite) {
       this.playerSprite = this.add.sprite(this.player.x, this.player.getRenderY(), "character");
       this.playerSprite.setOrigin(0.5, 1);
     } else {
       this.playerSprite.setPosition(this.player.x, this.player.getRenderY());
+      this.playerSprite.setVisible(true);
     }
   }
 
@@ -112,6 +132,7 @@ export class LevelScene extends Phaser.Scene {
       const img = this.add.image(item.x, item.y - 12, key);
       img.setDisplaySize(24, 24);
       container.add(img);
+      this.itemSprites.set(item, img);
     }
 
     for (const enemy of map.enemies) {
@@ -123,14 +144,27 @@ export class LevelScene extends Phaser.Scene {
     return container;
   }
 
-  update(_time: number, deltaMs: number): void {
-    if (!this.currentMap) return; // still loading
+  private flashRespawn(): void {
+    if (!this.playerSprite) return;
+    this.playerSprite.setTint(0xff0000);
+    this.time.delayedCall(150, () => this.playerSprite?.clearTint());
+  }
 
-    if (Phaser.Input.Keyboard.JustDown(this.nextLevelKey)) {
-      this.levelIndex = (this.levelIndex + 1) % LEVEL_URLS.length;
-      void this.loadLevel(this.levelIndex);
-      return;
-    }
+  private showGameComplete(): void {
+    this.gameComplete = true;
+    this.playerSprite?.setVisible(false);
+    this.add
+      .text(this.scale.width / 2, this.scale.height / 2, `GAME COMPLETE\nFinal score: ${this.player.score}`, {
+        fontFamily: "monospace",
+        fontSize: "32px",
+        color: "#ffffff",
+        align: "center",
+      })
+      .setOrigin(0.5);
+  }
+
+  update(_time: number, deltaMs: number): void {
+    if (this.gameComplete || !this.currentMap) return; // still loading, or finished
 
     const deltaSeconds = deltaMs / 1000;
     const input = this.readInput();
@@ -139,6 +173,18 @@ export class LevelScene extends Phaser.Scene {
 
     this.playerSprite.setPosition(this.player.x, this.player.getRenderY());
     this.playerSprite.setFlipX(this.player.facingDir < 0);
+
+    // Ported from CUISingleGame::OnUpdate: once every item on the current
+    // level is collected, advance to the next level (or finish, on the last one).
+    if (this.currentMap.items.length === 0) {
+      if (this.levelIndex + 1 < LEVEL_URLS.length) {
+        this.levelIndex += 1;
+        this.currentMap = null; // pause updates while the next level loads
+        void this.loadLevel(this.levelIndex);
+      } else {
+        this.showGameComplete();
+      }
+    }
   }
 
   private readInput(): InputType {
