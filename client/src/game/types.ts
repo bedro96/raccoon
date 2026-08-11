@@ -22,7 +22,7 @@ export interface Spike {
   y: number;
 }
 
-export type ItemType = "CARROT" | "CHERRY";
+export type ItemType = "CARROT" | "CHERRY" | "BANANA";
 
 export interface ItemData {
   x: number;

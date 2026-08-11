@@ -20,11 +20,13 @@ const LEVEL_URLS = ["/assets/levels/stage1.map", "/assets/levels/stage2.map"];
 
 // Display sizes (px). Original size for these was 24x24; enemy and CARROT
 // (item1) are rendered 50% larger per explicit request for visibility.
-// CHERRY (item2) is left at its original size. 36px still comfortably clears
-// the 120px row spacing, so there's no overlap with adjacent platforms.
+// CHERRY (item2) is left at its original size. BANANA gets the same 36px
+// treatment as CARROT so the wider crescent silhouette still reads clearly
+// without crowding the 120px row spacing.
 const ENEMY_DISPLAY_SIZE = 36;
 const CARROT_DISPLAY_SIZE = 36;
 const CHERRY_DISPLAY_SIZE = 24;
+const BANANA_DISPLAY_SIZE = 36;
 
 /**
  * Full playable level scene: loads a real level, renders it, and drives the
@@ -71,8 +73,25 @@ export class LevelScene extends Phaser.Scene {
     this.load.image("ladder", "/assets/sprites/ladder.png");
     this.load.image("item1", "/assets/sprites/item1.png");
     this.load.image("item2", "/assets/sprites/item2.png");
+    this.load.image("item3", "/assets/sprites/banana.png");
     this.load.image("spike", "/assets/sprites/spike.png");
     this.load.image("enemy", "/assets/sprites/enemy.png");
+    this.load.image("wolf", "/assets/sprites/wolf.png");
+  }
+
+  private getEnemyTextureKey(): "enemy" | "wolf" {
+    return this.levelIndex >= 2 ? "wolf" : "enemy";
+  }
+
+  private getItemRenderConfig(item: ItemData): { key: "item1" | "item2" | "item3"; size: number } {
+    switch (item.type) {
+      case "CARROT":
+        return { key: "item1", size: CARROT_DISPLAY_SIZE };
+      case "CHERRY":
+        return { key: "item2", size: CHERRY_DISPLAY_SIZE };
+      case "BANANA":
+        return { key: "item3", size: BANANA_DISPLAY_SIZE };
+    }
   }
 
   create(): void {
@@ -198,11 +217,10 @@ export class LevelScene extends Phaser.Scene {
       container.add(img);
     }
 
+    const enemyTextureKey = this.getEnemyTextureKey();
+
     for (const item of map.items) {
-      const key = item.type === "CARROT" ? "item1" : "item2";
-      // CARROT is rendered larger per explicit request; CHERRY (item2) keeps
-      // its original size for now.
-      const size = item.type === "CARROT" ? CARROT_DISPLAY_SIZE : CHERRY_DISPLAY_SIZE;
+      const { key, size } = this.getItemRenderConfig(item);
       const img = this.add.image(item.x, item.y - size / 2, key);
       img.setDisplaySize(size, size);
       container.add(img);
@@ -210,7 +228,11 @@ export class LevelScene extends Phaser.Scene {
     }
 
     for (const enemy of map.enemies) {
-      const img = this.add.image(enemy.currentX ?? enemy.x, (enemy.currentY ?? enemy.y) - ENEMY_DISPLAY_SIZE / 2, "enemy");
+      const img = this.add.image(
+        enemy.currentX ?? enemy.x,
+        (enemy.currentY ?? enemy.y) - ENEMY_DISPLAY_SIZE / 2,
+        enemyTextureKey,
+      );
       img.setDisplaySize(ENEMY_DISPLAY_SIZE, ENEMY_DISPLAY_SIZE);
       container.add(img);
       this.enemySprites.set(enemy, img);
@@ -266,11 +288,13 @@ export class LevelScene extends Phaser.Scene {
   }
 
   private updateEnemies(map: MapData): void {
+    const enemyTextureKey = this.getEnemyTextureKey();
     for (const enemy of map.enemies) {
       enemy.currentX = getEnemyPatrolX(enemy.x, enemy.patrolRange, this.levelElapsedSeconds);
       enemy.currentY = enemy.y;
       this.enemySprites
         .get(enemy)
+        ?.setTexture(enemyTextureKey)
         ?.setPosition(enemy.currentX, enemy.currentY - ENEMY_DISPLAY_SIZE / 2);
     }
   }

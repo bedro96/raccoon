@@ -16,7 +16,7 @@ import { FLOOR_LEFT_BOUND, FLOOR_RIGHT_BOUND } from "./constants";
  *   [int count][SEnemyData x count] -- float x, float y, float fPatrolRange       (12 bytes each)
  */
 
-const ITEM_TYPES: ItemType[] = ["CARROT", "CHERRY"];
+const ITEM_TYPES: ItemType[] = ["CARROT", "CHERRY", "BANANA"];
 
 class BinaryReader {
   private offset = 0;
