@@ -1,8 +1,9 @@
 import Phaser from "phaser";
 
 /**
- * Placeholder boot scene — confirms the Phaser canvas boots correctly.
- * Real gameplay scenes are added by later tickets (player movement, level loader, etc.).
+ * Brief boot scene — confirms the Phaser canvas boots correctly, then hands
+ * off to gameplay. Per the map's decision there's no menu/title screen, so
+ * this is just a minimal flash, not a UI the player lingers on.
  */
 export class BootScene extends Phaser.Scene {
   constructor() {
@@ -18,12 +19,6 @@ export class BootScene extends Phaser.Scene {
       })
       .setOrigin(0.5);
 
-    this.add
-      .text(this.scale.width / 2, this.scale.height / 2 + 48, "client scaffold booted", {
-        fontFamily: "monospace",
-        fontSize: "16px",
-        color: "#888888",
-      })
-      .setOrigin(0.5);
+    this.time.delayedCall(200, () => this.scene.start("PlayScene"));
   }
 }
