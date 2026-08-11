@@ -23,6 +23,7 @@ const LEVEL_URLS = [
   "/assets/levels/stage2.map",
   "/assets/levels/stage3.map",
   "/assets/levels/stage4.map",
+  "/assets/levels/stage5.map",
 ];
 
 // Display sizes (px). Original size for these was 24x24; enemy and CARROT
