@@ -19,6 +19,6 @@ export class BootScene extends Phaser.Scene {
       })
       .setOrigin(0.5);
 
-    this.time.delayedCall(200, () => this.scene.start("PlayScene"));
+    this.time.delayedCall(200, () => this.scene.start("LevelScene"));
   }
 }
