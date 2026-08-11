@@ -118,13 +118,14 @@ const DT = 1 / 240; // fine-grained simulation step, independent of any real fra
   assertClose("Move step over 10 discrete inputs (px)", displacement, MOVE_STEP * frames, 0.01);
 }
 
-// --- 5. Move speed is deliberately 10% slower than the original's documented 6.0 px/frame
-// (see "Slow down player movement by 10%" -- an intentional deviation from exact-replica
-// fidelity, not a bug).
+// --- 5. Move speed is deliberately slower than the original's documented 6.0 px/frame:
+// first 10% slower, then a further 20% slower on top of that (see "Slow down player
+// movement by 10%" and "Reduce Ponpoko's move speed by another 20%" -- intentional
+// deviations from exact-replica fidelity, not bugs).
 {
   const ORIGINAL_MOVE_STEP = 6.0;
-  const expected = ORIGINAL_MOVE_STEP * 0.9;
-  assertClose("MOVE_STEP is 10% slower than the original 6.0px", MOVE_STEP, expected, 0.001);
+  const expected = ORIGINAL_MOVE_STEP * 0.9 * 0.8;
+  assertClose("MOVE_STEP is 10% then a further 20% slower than the original 6.0px", MOVE_STEP, expected, 0.001);
 }
 
 console.log("");
