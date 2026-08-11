@@ -159,6 +159,7 @@ export class LevelScene extends Phaser.Scene {
       this.playerSprite.setPosition(this.player.x, this.player.getRenderY());
       this.playerSprite.setVisible(true);
     }
+    this.playerSprite.setRotation(this.player.jumpRotation);
   }
 
   private drawGeometry(map: MapData): Phaser.GameObjects.Container {
@@ -252,6 +253,7 @@ export class LevelScene extends Phaser.Scene {
     this.player.checkHazards(this.currentMap);
 
     this.playerSprite.setPosition(this.player.x, this.player.getRenderY());
+    this.playerSprite.setRotation(this.player.jumpRotation);
     // The character sprite's native art faces left, so mirror it only when
     // facing/moving right (facingDir > 0) -- previously inverted, causing the
     // sprite to face backward while walking and during the jump arc.

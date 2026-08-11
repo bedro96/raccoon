@@ -25,6 +25,8 @@ export type InputType = "MoveLeft" | "MoveRight" | "ClimbUp" | "ClimbDown" | "Ju
  * is a fixed-duration parabolic arc that does not change row.
  */
 export class PlayerController {
+  private static readonly MAX_JUMP_ROTATION = Math.PI / 6;
+
   x = 0;
   row = 0;
   score = 0;
@@ -33,6 +35,7 @@ export class PlayerController {
   jumping = false;
   private jumpTimer = 0;
   jumpOffsetY = 0;
+  jumpRotation = 0;
   private jumpStartX = 0;
 
   rowTransition = false;
@@ -60,6 +63,7 @@ export class PlayerController {
     this.jumping = false;
     this.jumpTimer = 0;
     this.jumpOffsetY = 0;
+    this.jumpRotation = 0;
     this.rowTransition = false;
     this.falling = false;
     this.rowOffsetY = 0;
@@ -166,6 +170,7 @@ export class PlayerController {
       case "Jump":
         this.jumping = true;
         this.jumpTimer = 0;
+        this.jumpRotation = 0;
         this.jumpStartX = this.x;
         break;
       default:
@@ -206,6 +211,7 @@ export class PlayerController {
 
     this.jumpTimer += deltaSeconds;
     const t = this.jumpTimer >= JUMP_DURATION ? 1 : this.jumpTimer / JUMP_DURATION;
+    const jumpArc = 4 * t * (1 - t);
 
     this.x = this.jumpStartX + this.facingDir * JUMP_DISTANCE * t;
     if (this.x < FLOOR_LEFT_BOUND) this.x = FLOOR_LEFT_BOUND;
@@ -214,6 +220,7 @@ export class PlayerController {
     if (this.jumpTimer >= JUMP_DURATION) {
       this.jumping = false;
       this.jumpOffsetY = 0;
+      this.jumpRotation = 0;
 
       if (!this.tryGetPlatformBounds(map, this.x)) {
         this.startRowTransition(this.row + 1, true);
@@ -223,7 +230,8 @@ export class PlayerController {
       return;
     }
 
-    this.jumpOffsetY = 4 * JUMP_HEIGHT * t * (1 - t);
+    this.jumpOffsetY = JUMP_HEIGHT * jumpArc;
+    this.jumpRotation = PlayerController.MAX_JUMP_ROTATION * jumpArc * this.facingDir;
   }
 
   /** Current render Y: row Y plus any in-progress row-transition/jump offset. */
@@ -237,6 +245,7 @@ export class PlayerController {
     this.row = this.startRow;
     this.jumping = false;
     this.jumpOffsetY = 0;
+    this.jumpRotation = 0;
     this.rowTransition = false;
     this.falling = false;
     this.rowOffsetY = 0;
