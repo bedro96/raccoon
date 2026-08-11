@@ -44,13 +44,14 @@ export class PlayerController {
   private transitionFromRow = 0;
   private transitionToRow = 0;
   rowOffsetY = 0;
+  private dead = false;
 
   private startX = 0;
   private startRow = 0;
 
   /** Fired when the player picks up an item (score already applied). */
   onItemPickup?: (item: ItemData) => void;
-  /** Fired when the player is respawned after hitting a spike or enemy. */
+  /** Fired when the player dies to a spike or enemy; the scene triggers the visual respawn flow. */
   onHazardHit?: () => void;
 
   reset(startPos: { x: number; y: number }, startRow: number): void {
@@ -67,6 +68,7 @@ export class PlayerController {
     this.rowTransition = false;
     this.falling = false;
     this.rowOffsetY = 0;
+    this.dead = false;
   }
 
   private tryGetPlatformBounds(map: MapData, atX: number): { startX: number; endX: number } | null {
@@ -108,11 +110,18 @@ export class PlayerController {
   }
 
   private checkHazardsInternal(map: MapData): void {
+    if (this.dead) return;
+
     const rowY = getRowY(this.row);
 
     for (const spike of map.spikes) {
       if (spike.y === rowY && Math.abs(spike.x - this.x) <= PICKUP_RADIUS) {
-        this.respawn();
+        this.dead = true;
+        this.jumping = false;
+        this.jumpOffsetY = 0;
+        this.rowTransition = false;
+        this.falling = false;
+        this.rowOffsetY = 0;
         this.onHazardHit?.();
         return;
       }
@@ -122,7 +131,12 @@ export class PlayerController {
       const enemyX = enemy.currentX ?? enemy.x;
       const enemyY = enemy.currentY ?? enemy.y;
       if (enemyY === rowY && Math.abs(enemyX - this.x) <= PICKUP_RADIUS) {
-        this.respawn();
+        this.dead = true;
+        this.jumping = false;
+        this.jumpOffsetY = 0;
+        this.rowTransition = false;
+        this.falling = false;
+        this.rowOffsetY = 0;
         this.onHazardHit?.();
         return;
       }
@@ -136,11 +150,12 @@ export class PlayerController {
 
   /** Re-check hazards against the player's current position, even if the player is idle. */
   checkHazards(map: MapData): void {
-    if (this.jumping || this.rowTransition) return;
+    if (this.dead || this.jumping || this.rowTransition) return;
     this.checkHazardsInternal(map);
   }
 
   applyInput(input: InputType, map: MapData): void {
+    if (this.dead) return;
     if ((this.jumping || this.rowTransition) && input !== "None") return;
 
     switch (input) {
@@ -183,6 +198,8 @@ export class PlayerController {
   }
 
   update(deltaSeconds: number, map: MapData): void {
+    if (this.dead) return;
+
     if (this.rowTransition) {
       const duration = this.falling ? FALL_DURATION : CLIMB_DURATION;
       this.rowTransitionTimer += deltaSeconds;
@@ -240,6 +257,10 @@ export class PlayerController {
     return baseY + this.rowOffsetY - this.jumpOffsetY;
   }
 
+  isDead(): boolean {
+    return this.dead;
+  }
+
   respawn(): void {
     this.x = this.startX;
     this.row = this.startRow;
@@ -249,5 +270,6 @@ export class PlayerController {
     this.rowTransition = false;
     this.falling = false;
     this.rowOffsetY = 0;
+    this.dead = false;
   }
 }

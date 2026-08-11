@@ -4,13 +4,17 @@
  * independent of any browser/Phaser runtime.
  */
 import { PlayerController } from "../src/game/PlayerController";
-import { FLOOR_Y, getRowY } from "../src/game/constants";
+import { FLOOR_Y, MOVE_STEP, getRowY } from "../src/game/constants";
 import type { MapData } from "../src/game/types";
 
 let failures = 0;
 function assertTrue(label: string, cond: boolean): void {
   console.log(`[${cond ? "PASS" : "FAIL"}] ${label}`);
   if (!cond) failures++;
+}
+
+function assertClose(label: string, actual: number, expected: number, epsilon = 0.001): void {
+  assertTrue(label, Math.abs(actual - expected) <= epsilon);
 }
 
 function baseMap(): MapData {
@@ -41,19 +45,29 @@ function baseMap(): MapData {
   assertTrue("onItemPickup callback fired", pickedUp !== null);
 }
 
-// 2. Spike hazard: respawn + callback, item pickup logic doesn't also fire for the same tile incorrectly
+// 2. Spike hazard: callback fires at the death location, movement freezes, and
+// explicit respawn is required to return to the start position.
 {
   const map = baseMap();
   map.spikes.push({ x: 105, y: FLOOR_Y });
   const p = new PlayerController();
   p.reset(map.startPos, 4);
-  let hazardFired = false;
-  p.onHazardHit = () => (hazardFired = true);
+  let hazardFired = 0;
+  let hazardX = -1;
+  p.onHazardHit = () => hazardFired++;
 
   p.applyInput("MoveRight", map);
+  hazardX = p.x;
+  p.checkHazards(map);
 
-  assertTrue("Spike hazard triggers respawn (x back to start)", p.x === map.startPos.x);
-  assertTrue("onHazardHit callback fired for spike", hazardFired);
+  p.applyInput("MoveLeft", map);
+
+  assertClose("Spike hazard leaves the player at the hit location until respawn", hazardX, map.startPos.x + MOVE_STEP);
+  assertTrue("onHazardHit callback fires once for spike death", hazardFired === 1);
+  assertClose("Dead players ignore movement input while blinking", p.x, hazardX);
+
+  p.respawn();
+  assertClose("Explicit respawn returns the player to the start position", p.x, map.startPos.x);
 }
 
 // 3. Enemy hazard: follows the enemy's live/current position, even when the
@@ -69,8 +83,11 @@ function baseMap(): MapData {
 
   p.checkHazards(map);
 
-  assertTrue("Enemy hazard (at live/current position) triggers respawn", p.x === map.startPos.x);
+  assertTrue("Enemy hazard (at live/current position) leaves the player at the hit location", p.x === 110);
   assertTrue("onHazardHit callback fired for enemy", hazardFired);
+
+  p.respawn();
+  assertTrue("Enemy hazard can be followed by an explicit respawn", p.x === map.startPos.x);
 }
 
 // 4. No false-positive pickup/hazard when nothing is within range

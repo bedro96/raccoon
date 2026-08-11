@@ -6,10 +6,7 @@ export type RespawnBlinkStep = {
 export const RESPAWN_BLINK_COUNT = 3;
 export const RESPAWN_BLINK_INTERVAL_MS = 120;
 
-/**
- * Builds the visibility toggles for a respawn blink sequence after the caller
- * has already hidden the sprite immediately.
- */
+/** Builds the visibility toggles for a respawn blink sequence at the death location. */
 export function buildRespawnBlinkSequence(blinks: number, intervalMs: number): RespawnBlinkStep[] {
   if (blinks < 1) return [];
 
@@ -17,16 +14,18 @@ export function buildRespawnBlinkSequence(blinks: number, intervalMs: number): R
   for (let blinkIndex = 0; blinkIndex < blinks; blinkIndex++) {
     steps.push({
       delayMs: blinkIndex * intervalMs * 2 + intervalMs,
-      visible: true,
+      visible: false,
     });
 
-    if (blinkIndex < blinks - 1) {
-      steps.push({
-        delayMs: (blinkIndex + 1) * intervalMs * 2,
-        visible: false,
-      });
-    }
+    steps.push({
+      delayMs: (blinkIndex + 1) * intervalMs * 2,
+      visible: true,
+    });
   }
 
   return steps;
+}
+
+export function getRespawnBlinkDuration(blinks: number, intervalMs: number): number {
+  return blinks < 1 ? 0 : blinks * intervalMs * 2;
 }

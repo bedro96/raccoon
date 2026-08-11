@@ -7,6 +7,7 @@ import {
   buildRespawnBlinkSequence,
   RESPAWN_BLINK_COUNT,
   RESPAWN_BLINK_INTERVAL_MS,
+  getRespawnBlinkDuration,
 } from "../game/respawnBlink";
 import type { ItemData, MapData } from "../game/types";
 
@@ -230,13 +231,24 @@ export class LevelScene extends Phaser.Scene {
     if (!this.playerSprite) return;
 
     this.clearRespawnBlink();
-    this.playerSprite.setVisible(false);
 
-    this.respawnBlinkTimers = buildRespawnBlinkSequence(RESPAWN_BLINK_COUNT, RESPAWN_BLINK_INTERVAL_MS).map((step) =>
+    const steps = buildRespawnBlinkSequence(RESPAWN_BLINK_COUNT, RESPAWN_BLINK_INTERVAL_MS);
+    const timers = steps.map((step) =>
       this.time.delayedCall(step.delayMs, () => {
         this.playerSprite?.setVisible(step.visible);
       }),
     );
+
+    timers.push(
+      this.time.delayedCall(getRespawnBlinkDuration(RESPAWN_BLINK_COUNT, RESPAWN_BLINK_INTERVAL_MS), () => {
+        this.player.respawn();
+        this.playerSprite?.setPosition(this.player.x, this.player.getRenderY());
+        this.playerSprite?.setVisible(true);
+        this.respawnBlinkTimers = [];
+      }),
+    );
+
+    this.respawnBlinkTimers = timers;
   }
 
   private showGameComplete(): void {
@@ -284,7 +296,7 @@ export class LevelScene extends Phaser.Scene {
 
     // Ported from CUISingleGame::OnUpdate: once every item on the current
     // level is collected, advance to the next level (or finish, on the last one).
-    if (this.currentMap.items.length === 0) {
+    if (!this.player.isDead() && this.currentMap.items.length === 0) {
       if (this.levelIndex + 1 < LEVEL_URLS.length) {
         this.levelIndex += 1;
         this.currentMap = null; // pause updates while the next level loads
