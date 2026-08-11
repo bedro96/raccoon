@@ -2,8 +2,8 @@
  * Deterministic verification for issue #46's map-loader extension:
  * eType=2 must decode to BANANA while preserving the item's score payload.
  * Also covers the pure sprite-selection helpers used by LevelScene to pick
- * the enemy (enemy vs. wolf, by level index) and item (carrot/cherry/banana)
- * texture keys.
+ * the enemy (enemy vs. wolf vs. hunter, by level index) and item
+ * (carrot/cherry/banana) texture keys.
  *
  * Run with: npx tsx scripts/verify-wolf-banana.ts
  */
@@ -61,6 +61,8 @@ assertTrue("Level 1 (index 0) uses the original enemy sprite", getEnemyTextureKe
 assertTrue("Level 2 (index 1) uses the original enemy sprite", getEnemyTextureKey(1) === "enemy");
 assertTrue("Level 3 (index 2) uses the wolf sprite", getEnemyTextureKey(2) === "wolf");
 assertTrue("Level 4 (index 3) uses the wolf sprite", getEnemyTextureKey(3) === "wolf");
+assertTrue("Level 5 (index 4) uses the hunter sprite", getEnemyTextureKey(4) === "hunter");
+assertTrue("Level 6+ (index 5) keeps using the hunter sprite", getEnemyTextureKey(5) === "hunter");
 
 // --- Item sprite/size selection ---
 const sizes = { carrot: 36, cherry: 24, banana: 36 };

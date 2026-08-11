@@ -84,9 +84,10 @@ export class LevelScene extends Phaser.Scene {
     this.load.image("spike", "/assets/sprites/spike.png");
     this.load.image("enemy", "/assets/sprites/enemy.png");
     this.load.image("wolf", "/assets/sprites/wolf.png");
+    this.load.image("hunter", "/assets/sprites/hunter.png");
   }
 
-  private getEnemyTextureKey(): "enemy" | "wolf" {
+  private getEnemyTextureKey(): "enemy" | "wolf" | "hunter" {
     return getEnemyTextureKey(this.levelIndex);
   }
 

@@ -4,12 +4,14 @@ import type { ItemData } from "./types";
  * Pure sprite-selection logic, extracted for testability (matching the
  * enemyPatrol.ts/respawnBlink.ts convention already used in this codebase).
  *
- * Wolf vs. the original enemy sprite is selected by level index rather than
- * per-enemy data, since the original binary .map format has no per-enemy
+ * Enemy-vs-wolf-vs-hunter sprite selection is driven by level index rather
+ * than per-enemy data, since the original binary .map format has no per-enemy
  * "kind" field. Levels 1-2 (index 0-1) keep the original enemy sprite;
- * Levels 3-4 (index 2-3) render the new wolf sprite for all their enemies.
+ * Levels 3-4 (index 2-3) render the wolf sprite; Level 5+ (index >= 4)
+ * render the hunter sprite for all their enemies.
  */
-export function getEnemyTextureKey(levelIndex: number): "enemy" | "wolf" {
+export function getEnemyTextureKey(levelIndex: number): "enemy" | "wolf" | "hunter" {
+  if (levelIndex >= 4) return "hunter";
   return levelIndex >= 2 ? "wolf" : "enemy";
 }
 
