@@ -248,7 +248,7 @@ export class PlayerController {
     }
 
     this.jumpOffsetY = JUMP_HEIGHT * jumpArc;
-    this.jumpRotation = PlayerController.MAX_JUMP_ROTATION * jumpArc * this.facingDir;
+    this.jumpRotation = -PlayerController.MAX_JUMP_ROTATION * jumpArc * this.facingDir;
   }
 
   /** Current render Y: row Y plus any in-progress row-transition/jump offset. */

@@ -32,7 +32,7 @@ const map: MapData = {
   enemies: [],
 };
 
-// 1. Facing right: upright at jump start/end, peaks at +30deg mid-arc.
+// 1. Facing right: upright at jump start/end, peaks at -30deg mid-arc.
 {
   const p = new PlayerController();
   p.reset(map.startPos, 4);
@@ -42,7 +42,7 @@ const map: MapData = {
   assertClose("Right-facing jump rotation at jump start", p.jumpRotation, 0);
 
   p.update(JUMP_DURATION / 2, map);
-  assertClose("Right-facing jump rotation at arc peak", p.jumpRotation, PEAK_ROTATION);
+  assertClose("Right-facing jump rotation at arc peak", p.jumpRotation, -PEAK_ROTATION);
 
   p.update(JUMP_DURATION / 2, map);
   assertClose("Right-facing jump rotation at jump end", p.jumpRotation, 0);
@@ -55,7 +55,7 @@ const map: MapData = {
   p.applyInput("MoveLeft", map);
   p.applyInput("Jump", map);
   p.update(JUMP_DURATION / 2, map);
-  assertClose("Left-facing jump rotation at arc peak", p.jumpRotation, -PEAK_ROTATION);
+  assertClose("Left-facing jump rotation at arc peak", p.jumpRotation, PEAK_ROTATION);
 }
 
 console.log("");
